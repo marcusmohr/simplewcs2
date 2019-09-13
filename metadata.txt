@@ -11,6 +11,7 @@ author=Landesvermessung und Geobasisinformation Brandenburg - Marcus Mohr
 email=marcus.mohr@geobasis-bb.de
 changelog=
    0.1 - First testing release (experimental)
+   0.2 - Added support for alternative implementation of crs extension, fixed wrong warnings (experimental)
 tracker=https://github.com/marcusmohr/simplewcs2/issues
 repository=https://github.com/marcusmohr/simplewcs2
 tags=wcs, wcs 2, ogc, web coverage service, tiff, geotiff, aerial, orthophotos, dop, dgm
