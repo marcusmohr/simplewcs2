@@ -406,9 +406,11 @@ class SimpleWCS:
     def logInfoMessage(self, msg):
         QgsMessageLog.logMessage(msg, logheader, Qgis.Info)
 
+
     @classmethod
     def logWarnMessage(self, msg):
         QgsMessageLog.logMessage(msg, logheader, Qgis.Warning)
+
 
     @classmethod
     def openLog(self):
