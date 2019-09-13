@@ -2,7 +2,7 @@
         Simple WCS 2 - QGIS Plugin
         Basic support for OGC WCS 2.X
 
-        created by Marcus Mohr (LGB)
+        created by Landesvermessung und Geobasisinformation Brandenburg
         email: marcus.mohr@geobasis-bb.de
         licence: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
 """
