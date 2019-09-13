@@ -16,6 +16,7 @@ class WCS:
         ows = '{http://www.opengis.net/ows/2.0}'
         wcs = '{http://www.opengis.net/wcs/2.0}'
         crs = '{http://www.opengis.net/wcs/crs/1.0}'
+        crs_nonstandard = '{http://www.opengis.net/wcs/service-extension/crs/1.0}'
         xlink = '{http://www.w3.org/1999/xlink}'
 
         self.capabilities = capabilities
@@ -41,6 +42,12 @@ class WCS:
         contents = self.capabilities.find(wcs + 'ServiceMetadata')
         for crs in contents.findall('.//' + wcs + 'Extension/' + crs + 'CrsMetadata/' + crs + 'crsSupported'):
             self.crsx.append(crs.text)
+
+        # in case of wrong crs extension implementation
+        if not self.crsx:
+            contents = self.capabilities.find(wcs + 'ServiceMetadata')
+            for crs in contents.findall('.//' + wcs + 'Extension/' + crs_nonstandard + 'crsSupported'):
+                self.crsx.append(crs.text)
 
         self.formats = []
         contents = self.capabilities.find(wcs + 'ServiceMetadata')
