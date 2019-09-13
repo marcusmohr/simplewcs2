@@ -193,7 +193,7 @@ class SimpleWCS:
                     versionsOk = False
 
         if versionsOk is False:
-            self.logMessage('WCS does not support one of the following Versions: ' + ', '.join(self.acceptedVersions))
+            self.logWarnMessage('WCS does not support one of the following Versions: ' + ', '.join(self.acceptedVersions))
             self.openLog()
 
 
@@ -323,7 +323,7 @@ class SimpleWCS:
         coverage = self.describeCoverage(covId)
 
         #range = coverage.getRange()
-        #self.logMessage(str(range))
+        #self.logInfoMessage(str(range))
 
         labels = coverage.getAxisLabels()
         label0 = labels[0]
@@ -360,18 +360,18 @@ class SimpleWCS:
 
 
     def requestXML(self, url):
-        self.logMessage('Requested URL: ' + url)
+        self.logInfoMessage('Requested URL: ' + url)
 
         try:
             xmlReponse = urllib.request.urlopen(url)
         except HTTPError as e:
-            self.logMessage(str(e))
-            self.logMessage(str(e.read().decode()))
+            self.logWarnMessage(str(e))
+            self.logWarnMessage(str(e.read().decode()))
             self.openLog()
             return None
         except URLError as e:
-            self.logMessage(str(e))
-            self.logMessage(str(e.read().decode()))
+            self.logWarnMessage(str(e))
+            self.logWarnMessage(str(e.read().decode()))
             self.openLog()
             return None
 
@@ -403,9 +403,12 @@ class SimpleWCS:
 
 
     @classmethod
-    def logMessage(self, msg):
-        QgsMessageLog.logMessage(msg, logheader)
+    def logInfoMessage(self, msg):
+        QgsMessageLog.logMessage(msg, logheader, Qgis.Info)
 
+    @classmethod
+    def logWarnMessage(self, msg):
+        QgsMessageLog.logMessage(msg, logheader, Qgis.Warning)
 
     @classmethod
     def openLog(self):
@@ -418,17 +421,17 @@ class SimpleWCS:
 
 
 def getCoverage(task, url, covId):
-    SimpleWCS.logMessage('Requested URL: ' + url)
+    SimpleWCS.logInfoMessage('Requested URL: ' + url)
 
     try:
         file, header = urllib.request.urlretrieve(url)
     except HTTPError as e:
-        SimpleWCS.logMessage(str(e))
-        SimpleWCS.logMessage(str(e.read().decode()))
+        SimpleWCS.logWarnMessage(str(e))
+        SimpleWCS.logWarnMessage(str(e.read().decode()))
         return None
     except URLError as e:
-        SimpleWCS.logMessage(str(e))
-        SimpleWCS.logMessage(str(e.read().decode()))
+        SimpleWCS.logWarnMessage(str(e))
+        SimpleWCS.logWarnMessage(str(e.read().decode()))
         return None
 
     return {'file': file, 'coverage': covId}
@@ -448,7 +451,7 @@ def addRLayer(exception, values=None):
         QgsProject.instance().addMapLayer(rlayer)
     else:
         SimpleWCS.openLog()
-        SimpleWCS.logMessage('Error while loading Coverage!')
+        SimpleWCS.logWarnMessage('Error while loading Coverage!')
 
     SimpleWCS.enableBtnGetCoverage()
     SimpleWCS.cancelMessageBar()
