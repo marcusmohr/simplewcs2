@@ -5,6 +5,8 @@
         created by Landesvermessung und Geobasisinformation Brandenburg
         email: marcus.mohr@geobasis-bb.de
         licence: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
+
+        Functions are written in mixedCase, see https://docs.qgis.org/testing/en/docs/developers_guide/codingstandards.html
 """
 
 import os.path, urllib, xml.etree.ElementTree
