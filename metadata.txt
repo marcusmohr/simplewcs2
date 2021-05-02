@@ -3,7 +3,7 @@ name=Simple WCS 2
 qgisMinimumVersion=3.4
 description=Provides basic support for OGC WCS 2.X and tiff format
 about=
-   Rececive tiff files from OGC Web Coverage Services (v2.X) based on your map view. Designed to access certain german official geodata, e.g. digital aerial photographs.
+   Receive tiff files from OGC Web Coverage Services (v2.X) based on your map view. Designed to access certain german official geodata, e.g. digital aerial photographs.
    What it supports: WCS 2.X Core, CRS-Extension, Protocol-Binding KVP, Geo-TIFF
    What it doesn't support: Time series, scaling, gml cov, other extensions...
 version=0.2
