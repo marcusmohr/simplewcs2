@@ -20,8 +20,10 @@ class Coverage:
 
         self.coverage = coverage
 
-        self.axisLabels = self.coverage.find(wcs + 'CoverageDescription/' + gml + 'boundedBy/' + gml + 'Envelope').attrib['axisLabels']
-        self.axisLabels = self.axisLabels.split(" ")
+        envelope = self.coverage.find(wcs + 'CoverageDescription/' + gml + 'boundedBy/' + gml + 'Envelope')
+        if envelope is None:
+            envelope = self.coverage.find(wcs + 'CoverageDescription/' + gml + 'boundedBy/' + gml + 'EnvelopeWithTimePeriod')
+        self.axisLabels = envelope.attrib['axisLabels'].split(" ")
 
         self.range = []
         contents = self.coverage.find(wcs + 'CoverageDescription')
