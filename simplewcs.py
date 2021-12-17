@@ -337,7 +337,7 @@ class SimpleWCS:
         subset1 = label1 + '(' + str(coordinates[1]) + ',' + str(coordinates[3]) + ')'
 
         outputcrs = self.dlg.cbCRS.currentText()
-        mapcrs = self.iface.mapCanvas().mapSettings().destinationCrs().authid()
+        mapcrs = self.dlg.cbCRS.currentText()
         format = self.dlg.cbFormat.currentText()
 
         params = [('REQUEST', 'GetCoverage'), ('SERVICE', 'WCS'), ('VERSION', version), ('COVERAGEID', covId), ('OUTPUTCRS', outputcrs), ('SUBSETTINGCRS', mapcrs), ('FORMAT', format), ('SUBSET', subset0), ('SUBSET', subset1)]
