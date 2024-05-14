@@ -45,18 +45,11 @@ from qgis.utils import iface
 
 from .simplewcs_dialog import SimpleWCSDialog
 from .resources import *
-from .capabilities import *
-from .coverage import *
+
 
 class SimpleWCS:
 
     def __init__(self, iface):
-        """
-        The constructor!
-
-        :param iface: iface
-        """
-
         self.plugin_dir = os.path.dirname(__file__)
         locale = QSettings().value('locale/userLocale')[0:2]
         locale_path = os.path.join(
@@ -71,69 +64,55 @@ class SimpleWCS:
 
         self.actions = []
         self.menu = self.tr('&Simple WCS 2')
-        self.firstStart = None
-        self.dlg: SimpleWCSDialog=None
+        self.dlg: SimpleWCSDialog = None
 
     def tr(self, message):
         """
         Returns a translated string
         """
-
         return QCoreApplication.translate('SimpleWCS', message)
 
-    def add_action(
-            self,
-            iconPath,
-            text,
-            callback,
-            enabledFlag=True,
-            addToMenu=True,
-            addToToolbar=True,
-            statusTip=None,
-            whatsThis=None,
-            parent=None):
+    def add_action(self,
+                   iconPath,
+                   text,
+                   callback,
+                   enabledFlag=True,
+                   addToMenu=True,
+                   addToToolbar=True,
+                   statusTip=None,
+                   whatsThis=None,
+                   parent=None):
         """
         Adds plugin icon to toolbar
         """
-
         icon = QIcon(iconPath)
         action = QAction(icon, text, parent)
         action.triggered.connect(callback)
         action.setEnabled(enabledFlag)
-
         if statusTip is not None:
             action.setStatusTip(statusTip)
-
         if whatsThis is not None:
             action.setWhatsThis(whatsThis)
-
         if addToToolbar:
             iface.addToolBarIcon(action)
-
         if addToMenu:
             iface.addPluginToRasterMenu(self.menu, action)
-
         self.actions.append(action)
-
         return action
 
     def initGui(self):
         """
-        Create the menu entries and toolbar icons inside the QGIS GUI.
+        Create the toolbar icon inside the QGIS GUI.
         """
         icon_path = ':/plugins/simplewcs/icon.png'
-        self.add_action(
-            icon_path,
-            text=self.tr('Simple WCS 2'),
-            callback=self.run,
-            parent=iface.mainWindow())
-
-        # will be set False in run()
-        self.firstStart = True
+        self.add_action(icon_path,
+                        text=self.tr('Simple WCS 2'),
+                        callback=self.run,
+                        parent=iface.mainWindow())
 
     def unload(self):
         """
-        Removes the plugin menu item and icon from QGIS GUI.
+        Removes the toolbar icon from QGIS GUI.
         """
         for action in self.actions:
             iface.removePluginRasterMenu(self.menu, action)
@@ -142,8 +121,6 @@ class SimpleWCS:
             self.dlg.resetPlugin()
 
     def run(self):
-        if self.firstStart == True:
-            self.firstStart = False
+        if not self.dlg:
             self.dlg = SimpleWCSDialog()
         self.dlg.show()
-

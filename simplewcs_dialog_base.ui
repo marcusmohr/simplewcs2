@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>415</width>
-    <height>569</height>
+    <height>633</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -32,6 +32,9 @@
       <number>0</number>
      </property>
      <widget class="QWidget" name="tabUrl">
+      <property name="enabled">
+       <bool>true</bool>
+      </property>
       <attribute name="title">
        <string>URL</string>
       </attribute>
@@ -54,7 +57,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLineEdit" name="leUrl">
+        <widget class="QLineEdit" name="leBaseUrl">
          <property name="inputMask">
           <string/>
          </property>
@@ -120,7 +123,7 @@
      </widget>
      <widget class="QWidget" name="tabGetCoverage">
       <property name="enabled">
-       <bool>true</bool>
+       <bool>false</bool>
       </property>
       <attribute name="title">
        <string>Get Coverage</string>
@@ -242,7 +245,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QComboBox" name="cbCRS"/>
+        <widget class="QComboBox" name="cbCrs"/>
        </item>
        <item>
         <widget class="QCheckBox" name="cbUseSubset">
@@ -377,39 +380,33 @@
            </widget>
           </item>
           <item>
-           <widget class="QWidget" name="wgShowExtent" native="true">
-            <layout class="QVBoxLayout" name="verticalLayout_6">
-             <item>
-              <widget class="QLabel" name="lblExtentPolygon">
-               <property name="font">
-                <font>
-                 <pointsize>7</pointsize>
-                </font>
-               </property>
-               <property name="text">
-                <string>&lt; no service loaded &gt;</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLabel" name="lblExtentMapCanvas">
-               <property name="font">
-                <font>
-                 <pointsize>7</pointsize>
-                </font>
-               </property>
-               <property name="text">
-                <string>&lt; no service loaded &gt;</string>
-               </property>
-               <property name="alignment">
-                <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-               </property>
-               <property name="wordWrap">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-            </layout>
+           <widget class="QLabel" name="lblExtentMapCanvas">
+            <property name="font">
+             <font>
+              <pointsize>7</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>&lt; no service loaded &gt;</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblExtentPolygon">
+            <property name="font">
+             <font>
+              <pointsize>7</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>&lt; no service loaded &gt;</string>
+            </property>
            </widget>
           </item>
          </layout>
@@ -439,7 +436,7 @@
      </widget>
      <widget class="QWidget" name="tabInformation">
       <property name="enabled">
-       <bool>true</bool>
+       <bool>false</bool>
       </property>
       <attribute name="title">
        <string>Information</string>

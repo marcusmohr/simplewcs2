@@ -6,71 +6,66 @@
         email: marcus.mohr@geobasis-bb.de
         licence: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
 """
-
-import os.path
-import urllib
+from dataclasses import dataclass
+from typing import List, Dict
 import xml.etree.ElementTree
 
+from .helpers import logWarnMessage
+
+@dataclass
+class CoverageInformation:
+    nativeCrs: str
+    axisLabels: List[str]
+
+wcs_ns = '{http://www.opengis.net/wcs/2.0}'
+gml_ns = '{http://www.opengis.net/gml/3.2}'
+gmlcov_ns = '{http://www.opengis.net/gmlcov/1.0}'
+swe_ns = '{http://www.opengis.net/swe/2.0}'
 
 class DescribeCoverage:
 
-    def __init__(self, coverage):
-        wcs_ns = '{http://www.opengis.net/wcs/2.0}'
-        gml_ns = '{http://www.opengis.net/gml/3.2}'
-        gmlcov_ns = '{http://www.opengis.net/gmlcov/1.0}'
-        swe_ns = '{http://www.opengis.net/swe/2.0}'
+    def __init__(self, coverageXmlResponse: xml.etree.ElementTree):
 
-        coverageDescription = coverage.find(wcs_ns + 'CoverageDescription')
+        self.coverageInformation: Dict[str, CoverageInformation] = None
 
-        envelopeElement = coverageDescription.find(gml_ns + 'boundedBy/' + gml_ns + 'Envelope')
-        if envelopeElement is not None:
-            print(envelopeElement)
-            self.boundingBoxCrsUri = envelopeElement.attrib['srsName']
-            if "crs-compound" in self.boundingBoxCrsUri:
-                raise NotImplementedError(f"Compound CRS are not supported (yet): {self.boundingBoxCrsUri}")
-            # ToDo: necessary? bounding box is retrieved from capabilities
-            upperCornerElement = envelopeElement.find(gml_ns + "upperCorner")
-            lowerCornerElement = envelopeElement.find(gml_ns + "lowerCorner")
-            if upperCornerElement is not None and lowerCornerElement is not None:
-                upperCorner = [float(v) for v in upperCornerElement.text.split(" ")]
-                lowerCorner = [float(v) for v in lowerCornerElement.text.split(" ")]
-                self.boundingBox = lowerCorner + upperCorner
+        self.readDescribeCoverage(coverageXmlResponse)
+
+    @property
+    def coverageInformation(self) -> Dict[str, CoverageInformation]:
+        return self._coverageInformation
+
+    @coverageInformation.setter
+    def coverageInformation(self, newInformation):
+        self._coverageInformation = newInformation
+
+    def readDescribeCoverage(self, coverageXmlResponse: xml.etree.ElementTree):
+
+        self.coverageInformation = {}
+
+        for covIdDescription in coverageXmlResponse.findall(f'.//{wcs_ns}CoverageDescription'):
+
+            covId = covIdDescription.attrib.get(f'{gml_ns}id')
+            if not covId:
+                logWarnMessage("Error in Describe Coverage: covId could not be read")
+                continue
+
+            envelopeElement = covIdDescription.find(f'{gml_ns}boundedBy/{gml_ns}Envelope')
+            if envelopeElement is not None:
+                nativeCrs = envelopeElement.attrib.get('srsName')
+                if not nativeCrs:
+                    logWarnMessage("Error in Describe Coverage: native crs could not be read")
+                    continue
+                axisLabels = envelopeElement.attrib.get('axisLabels')
+                if axisLabels:
+                    axisLabels = axisLabels.split(" ")
+                    if len(axisLabels) > 2:
+                        logWarnMessage(f"More than two axes are not supported (yet): {axisLabels}")
+                        continue
+                else:
+                    logWarnMessage("Error in Describe Coverage: native crs could not be read")
+                    continue
             else:
-                # raise error
-                pass
-            # We only support 2 axes for now  # TODO or can we just ignore non-spatial ones?
-            self.axisLabels = envelopeElement.attrib['axisLabels'].split(" ")
-            if len(self.axisLabels) > 2:
-                raise NotImplementedError(f"More than two axes are not supported (yet): {self.axisLabels}")
-        else:
-            # ToDo: log Message
-            self.boundingBoxCrsUri = None
-            self.axisLabels = None
+                logWarnMessage("Error in Describe Coverage: envelope could not be read")
+                continue
 
-        self.range = []
-        coverageDescription = coverage.find(wcs_ns + 'CoverageDescription')
-        if coverageDescription is not None:
-            for field in coverageDescription.findall('.//' + gmlcov_ns + 'rangeType/' + swe_ns + 'DataRecord/' + swe_ns + 'field'):
-                name = field.get('name')
-                self.range.append(name)
-        else:
-            # ToDo: log message
-            pass
-
-    def getBoundingBoxCrsUri(self):
-        return self.boundingBoxCrsUri
-
-    def getBoundingBox(self):
-        return self.boundingBox
-
-    def getAxisLabels(self):
-        return self.axisLabels
-
-    def setAxisLabels(self, axisLabels):
-        self.axisLabels = axisLabels
-
-    def getRange(self):
-        return self.range
-
-    def setRange(self, range):
-        self.range = range
+            self.coverageInformation[covId] = CoverageInformation(nativeCrs=nativeCrs, axisLabels=axisLabels)

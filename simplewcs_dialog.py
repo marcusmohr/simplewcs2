@@ -1,4 +1,4 @@
-"""lf.capabilities
+"""
         Simple WCS 2 - QGIS Plugin
         Basic support for OGC WCS 2.X
 
@@ -7,91 +7,80 @@
         licence: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
 """
 import os
-import json
 import urllib
 import xml.etree.ElementTree as ET
-from typing import Tuple
+from typing import List
 from urllib.error import HTTPError, URLError
-from urllib.request import Request
-from urllib.parse import urlparse
 
-from qgis.PyQt.QtCore import (QCoreApplication,
-                              QSettings,
-                              Qt,
-                              QTranslator,
+from qgis.PyQt.QtCore import (Qt,
                               QUrl,)
 from qgis.PyQt.QtGui import (QAction,
-                             QColor,
-                             QIcon,
-                             QKeySequence)
+                             QKeySequence,)
 from qgis.PyQt.QtWidgets import QShortcut
 
 from qgis.core import (QgsApplication,
                        QgsCoordinateReferenceSystem,
                        QgsCoordinateTransform,
-                       QgsDataSourceUri,
-                       QgsFeature,
                        QgsGeometry,
-                       QgsLayerTreeLayer,
-                       QgsMapLayer,
-                       QgsMessageLog,
                        QgsNetworkAccessManager,
                        QgsPoint,
-                       QgsPointXY,
                        QgsProject,
                        Qgis,
                        QgsTask,
                        QgsRasterLayer,
                        QgsRectangle,
-                       QgsRasterLayer,
-                       QgsVectorLayer,
-                       )
+                       QgsRasterLayer,)
+from qgis.gui import QgsMessageBar
 from qgis.utils import iface
 
 from qgis.PyQt import uic
 from qgis.PyQt.QtNetwork import QNetworkRequest
 from qgis.PyQt.QtWidgets import (QDialog,
-                                 QDockWidget,
                                  QProgressBar,)
 
 from .resources import *  # magically sets up icon etc...
 from .capabilities import Capabilities
 from .coverage import DescribeCoverage
-from .boundingBox import BoundingBox
-from .drawPolygon import DrawPolygon
-from .utils import crsAsOgcUri, getAxisLabels, switchCrsUriToOpenGis
+from .bounding_box import BoundingBox
+from .draw_polygon import DrawPolygon
+from .crs_utils import crsAsOgcUri, getAxisLabels, switchCrsUriToOpenGis
+from .helpers import openLog, logWarnMessage, logInfoMessage
+from .custom_exceptions import CapabilitiesException, DescribeCoverageException
 
-logheader = 'Simple WCS 2'
 
 # This loads your .ui file so that PyQt can populate your plugin with the elements from Qt Designer
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'simplewcs_dialog_base.ui'))
 
+wcs_ns = '{http://www.opengis.net/wcs/2.0}'
 
 class SimpleWCSDialog(QDialog, FORM_CLASS):
+
     def __init__(self, parent=None):
 
-        # Set up the user interface from Designer through FORM_CLASS.
-        # After self.setupUi() you can access any designer object by doing
-        # self.<objectname>, and you can use autoconnect slots - see
-        # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
-        # #widgets-and-dialogs-with-auto-connect
         super(SimpleWCSDialog, self).__init__(parent)
 
+        # Subset coordinates (polygon mode)
         self.requestXMinPolygon: float
         self.requestYMinPolygon: float
         self.requestXMaxPolygon: float
         self.requestYMaxPolygon: float
 
+        # Subset coordinates (canvas mode)
         self.requestXMinCanvas: float
         self.requestYMinCanvas: float
         self.requestXMaxCanvas: float
         self.requestYMaxCanvas: float
 
-        self.capabilities: Capabilities = None
         self.coverageBoundingBox: BoundingBox = None
-        self.requestBoundingBox: BoundingBox = None
+        self.subsetBoundingBox: BoundingBox = None
+
+        self.capabilities: Capabilities = None
+        self.describeCov: DescribeCoverage=None
+
         self.sketchingToolAction: QAction = None
+
+        self.mapCrs: str = self.getMapCrs()
 
         self.acceptedVersions = ['2.1.0', '2.0.1', '2.0.0']
 
@@ -102,25 +91,40 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
         self.connectSignals()
 
     def showEvent(self, event):
-        self.adjustToCovId()
+        """
+        Adjusts the Get Coverage Tab (Crs Dropdown, etc.)
+        and the extent Bounding Box to the current coverage (if set),
+        when the gui is shown.
+        """
+        self.adjustCovTabToCovIdAndCreateBB()
 
     def setupUi(self, widget):
 
         super().setupUi(widget)
 
-        self.tabGetCoverage.setEnabled(False)
-        self.tabInformation.setEnabled(False)
+        # Create a messageBar within the plugin gui
+        self.messageBar = QgsMessageBar(self)
+        self.layout().insertWidget(0, self.messageBar)
+        self.messageBar.hide()
 
+        self.setupUrlTab()
+
+        self.setupGetCoverageTab()
+
+    def setupUrlTab(self):
         self.cbVersion.addItems(self.acceptedVersions)
         self.cbVersion.setCurrentIndex(1)
-
         self.btnGetCapabilities.setEnabled(False)
 
-        self.cbUseSubset.setChecked(True)
-        self.showAndHideExtent()
+    def setupGetCoverageTab(self):
 
-        self.fillMapExtentCombo()
-        self.adjustToMapExtentMode()
+        self.cbUseSubset.setChecked(True)
+        self.showAndHideSubsetExtentWidget()
+
+        self.fillSubsetExtentModeCombo()
+        self.adjustCovTabToSubsetExtentMode()
+
+        # Create sketch tool to retrieve extent of the request from a polygon
         self.sketchingToolAction = QAction()
         self.sketchingToolAction.setIcon(QgsApplication.getThemeIcon('/mActionAddPolygon.svg'))
         self.sketchingToolAction.setToolTip('Draw a polygon on the canvas')
@@ -131,55 +135,63 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
 
     def connectSignals(self):
 
-        self.leUrl.textChanged.connect(self.enableBtnGetCapabilities)
-        self.btnGetCapabilities.clicked.connect(self.getCapabilitiesAndAdjustTabs)
+        self.leBaseUrl.textChanged.connect(self.enableBtnGetCapabilities)
+        self.btnGetCapabilities.clicked.connect(self.adjustTabsToService)
 
-        self.cbCoverage.currentIndexChanged.connect(self.adjustToCovId)
-        self.cbUseSubset.stateChanged.connect(self.showAndHideExtent)
-        self.cbSetExtentMode.currentIndexChanged.connect(self.adjustToMapExtentMode)
-        iface.mapCanvas().extentsChanged.connect(self.setExtentLabel)
+        self.cbCoverage.currentIndexChanged.connect(self.adjustCovTabToCovIdAndCreateBB)
+        self.cbUseSubset.stateChanged.connect(self.showAndHideSubsetExtentWidget)
+        self.cbSetExtentMode.currentIndexChanged.connect(self.adjustCovTabToSubsetExtentMode)
+        iface.mapCanvas().extentsChanged.connect(self.setSubsetExtentLabelFromMapCanvas)
         self.sketchingToolAction.triggered.connect(self.startSketchingTool)
-        QgsProject.instance().crsChanged.connect(self.clearBoundingBoxes)
+        QgsProject.instance().crsChanged.connect(self.adjustBoundingBoxesToCrsIfVisible)
+        QgsProject.instance().crsChanged.connect(self.adjustMapCrsLabelForSubsetExtent)
 
         self.btnGetCoverage.clicked.connect(self.getCovTask)
 
     def adjustBoundingBoxesToCrsIfVisible(self):
         if self.isVisible():
             self.clearBoundingBoxes()
-            self.adjustToCovId()
+            self.adjustCovTabToCovIdAndCreateBB()
 
     def setupKey(self):
+        """ Modify ESC key so that plugin is reset"""
         escKey = QShortcut(QKeySequence("ESC"), self)
         escKey.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         escKey.activated.connect(self.resetPlugin)
         escKey.setEnabled(True)
 
-    def showAndHideExtent(self):
+    def showAndHideSubsetExtentWidget(self):
         subsetModeIsActivated = self.cbUseSubset.isChecked()
-        if subsetModeIsActivated :
+        if subsetModeIsActivated:
             self.wgMapExtent.show()
         else:
             self.wgMapExtent.hide()
 
-    def fillMapExtentCombo(self):
+    def fillSubsetExtentModeCombo(self):
         self.cbSetExtentMode.clear()
         self.cbSetExtentMode.addItem("Get extent from map canvas", "canvas")
         self.cbSetExtentMode.addItem("Draw polygon", "polygon")
 
-    def adjustToMapExtentMode(self):
+    def adjustCovTabToSubsetExtentMode(self):
         extentMode = self.cbSetExtentMode.currentData()
         if extentMode == "canvas":
-            if self.requestBoundingBox:
-                self.requestBoundingBox.reset()
+            if self.subsetBoundingBox:
+                self.subsetBoundingBox.reset()
             self.tbDrawPolygon.hide()
             self.lblExtentMapCanvas.show()
             self.lblExtentPolygon.hide()
-            self.lblExtentPolygon.clear()
+            self.lblExtentPolygon.setText("Draw polygon to get extent coordinates")
         elif extentMode == "polygon":
             self.tbDrawPolygon.show()
             self.lblExtentMapCanvas.hide()
             self.lblExtentPolygon.show()
 
+    def adjustMapCrsLabelForSubsetExtent(self):
+        self.mapCrs = self.getMapCrs()
+        self.setSubsetExtentLabelFromMapCanvas()
+
+    def getMapCrs(self) -> str:
+        return QgsProject.instance().crs().authid()
 
     def startSketchingTool(self):
         self.sketchTool = DrawPolygon()
@@ -194,54 +206,126 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
     def onSketchFinished(self, geom: QgsGeometry):
         self.stopSketchingTool()
         if not geom.isGeosValid():
-            # ToDo: Write warning
-            iface.messageBar().pushWarning("Warning", "ADD WARNING")
+            errorMessage = "Drawn polygon has no valid geometry"
+            self.writeToPluginMessageBar(errorMessage,
+                                         level=Qgis.Warning)
             return
-        if not self.requestBoundingBox:
-            self.requestBoundingBox = BoundingBox('request_extent')
-        rectBB = self.requestBoundingBox.setBoundingBoxPolygon(geom)
-        self.setPolygonExtentLabel(rectBB)
+        if not self.subsetBoundingBox:
+            self.subsetBoundingBox = BoundingBox('request_extent')
+        rectBB = self.subsetBoundingBox.setBoundingBoxPolygon(geom)
+        self.setPolygonSubset(rectBB)
 
-    def setPolygonExtentLabel(self, rectBB: QgsRectangle):
-        self.requestXMaxPolygon = round(rectBB.xMaximum(), 7)
-        self.requestYMaxPolygon = round(rectBB.yMaximum(), 7)
-        self.requestXMinPolygon = round(rectBB.xMinimum(), 7)
-        self.requestYMinPolygon = round(rectBB.yMinimum(), 7)
-        self.lblExtentPolygon.setText(f"{self.requestXMinPolygon}, {self.requestYMinPolygon}, {self.requestXMaxPolygon}, {self.requestYMaxPolygon}")
+    def setPolygonSubset(self, rectBB: QgsRectangle):
+        self.setPolygonSubsetCoordinates(rectBB)
+        self.setPolygonSubsetLabel()
 
-    def getCapabilitiesAndAdjustTabs(self) -> bool:
+    def setPolygonSubsetCoordinates(self, rectBB: QgsRectangle):
+        self.requestXMaxPolygon = rectBB.xMaximum()
+        self.requestYMaxPolygon = rectBB.yMaximum()
+        self.requestXMinPolygon = rectBB.xMinimum()
+        self.requestYMinPolygon = rectBB.yMinimum()
 
-        """ ToDo """
+    def setPolygonSubsetLabel(self):
+        self.lblExtentPolygon.setText(
+            f"{round(self.requestXMinPolygon, 5)}, {round(self.requestYMinPolygon, 5)}, {round(self.requestXMaxPolygon, 5)}, {round(self.requestYMaxPolygon, 5)}\n(Map crs: {self.mapCrs})")
 
-        baseUrl = self.leUrl.text()
-        version = self.cbVersion.currentText()
-        capabilities = self.requestCapabilities(version=version, baseUrl=baseUrl)
-        self.capabilities = Capabilities(capabilities)
-
-        checkedVersion = self.checkVersion(version)
-        if not checkedVersion:
-            logWarnMessage(
-                f'WCS does not support one of the following Versions: {", ".join(self.acceptedVersions)}')
-            openLog()
+    def requestAndReadCapabilities(self) -> bool:
+        """
+        Returns False, if capabilities could not be read
+        """
+        baseUrl = self.leBaseUrl.text()
+        wcsVersion = self.cbVersion.currentText()
+        try:
+            capabilitiesXmlResponse = self.requestCapabilities(version=wcsVersion, baseUrl=baseUrl)
+            self.capabilities = Capabilities(capabilitiesXmlResponse)
+            return True
+        except CapabilitiesException as e:
+            errorMessage = e.args[0]
+            self.writeToPluginMessageBar(errorMessage,
+                                         level=Qgis.Warning)
+            logWarnMessage(errorMessage)
             return False
 
-        self.setCoverageAndInformationTab(checkedVersion)
-        return True
+    def getWcsVersion(self):
+        """ Reads the wcs version from the plugin gui (given by the user)
+        and compares it with the versions offered by the service"""
+        wcsVersion = self.cbVersion.currentText()
+        checkedVersion = self.getCheckedWcsVersion(wcsVersion)
+        if not checkedVersion:
+            return False
+        return checkedVersion
 
-    def checkVersion(self, version: str) -> str:
+    def adjustTabsToService(self):
 
-        versions = self.capabilities.getVersions()
-        if version in versions:
+        """
+        Retrieves the capabilities of the service.
+        If the capabilities could be retrieved successfully and wcs version supported by the plugin is found,
+        describeCoverage is requested for all available coverages and the tab 'Get Coverage' is enabled
+        and adjusted to the service and the coverages provided by the service.
+        """
+
+        self.cleanCoverageAndInformationTab()
+
+        capabilitiesRead = self.requestAndReadCapabilities()
+        if not capabilitiesRead:
+            self.capabilities = None
+            return
+
+        wcsVersion = self.getWcsVersion()
+        if not wcsVersion:
+            self.writeToPluginMessageBar(f'Service does not support one of the following Versions: {", ".join(self.acceptedVersions)}',
+                                         level=Qgis.Warning)
+            logWarnMessage(
+                f'Service does not support one of the following Versions: {", ".join(self.acceptedVersions)}')
+            return
+
+        describeCoverageRead = self.requestAndReadDescribeCoverage(wcsVersion)
+        if not describeCoverageRead:
+            self.capabilities = None
+            self.describeCov = None
+            return
+
+        self.setCoverageAndInformationTab(wcsVersion)
+
+    def requestAndReadDescribeCoverage(self, wcsVersion: str) -> bool:
+
+        covIds = self.capabilities.coverageSummary.keys()
+        try:
+            describeCoverageXmlResponse = self.requestDescribeCoverage(covIds, wcsVersion)
+            self.describeCov = DescribeCoverage(describeCoverageXmlResponse)
+            return True
+        except (DescribeCoverageException, NotImplementedError) as e:
+            errorMessage = e.args[0]
+            self.writeToPluginMessageBar(errorMessage,
+                                         level=Qgis.Warning)
+            logWarnMessage(errorMessage)
+            return False
+
+    def getCheckedWcsVersion(self, version: str) -> str:
+
+        """
+        Checks if the wcs version indicated by the user in the plugin gui is supported
+        by the wcs service.
+        If not it is checked if the service provides an other version, supported by the plugin. If so, the newest version is chosen.
+        If no supported version is provided by the service, None is returned.
+        """
+
+        if version in self.capabilities.versions:
             return version
         else:
-            for c_version in versions:
+            for c_version in self.capabilities.versions:
                 # Take the highest available version
                 if c_version in self.acceptedVersions:
+                    logInfoMessage(f"WCS {version} is not supported by the service, {c_version} is used instead")
                     return c_version
         return None
 
-    def setCoverageAndInformationTab(self, version: str):
-        self.setGetCoverageTab(version)
+    def cleanCoverageAndInformationTab(self):
+        self.cleanGetCoverageTab()
+        self.cleanInformationTab()
+
+    def setCoverageAndInformationTab(self, wcsVersion: str):
+        self.setGetCoverageTab(wcsVersion)
         self.setInformationTab()
 
     def setGetCoverageTab(self, version: str):
@@ -251,30 +335,28 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
         """
         self.tabGetCoverage.setEnabled(True)
 
-        self.cleanGetCoverageTab()
-
-        title = self.capabilities.getTitle()
-        self.lblTitle.setText(title)
+        self.lblTitle.setText(self.capabilities.title)
 
         self.lblVersion.setText(version)
 
-        formats = self.capabilities.getFormats()
-        for format in formats:
+        for format in self.capabilities.formats:
             if 'tiff' in format:
                 self.cbFormat.addItem(format)
 
-        if any('tiff' in format for format in formats):
+        if any('tiff' in format for format in self.capabilities.formats):
             self.btnGetCoverage.setEnabled(True)
         else:
             self.cbFormat.addItem('no tiff available')
             self.cbFormat.setEnabled(False)
 
         self.cbCoverage.clear()
-        for covId, _ in self.capabilities.getCoverageSummary().items():
-            self.cbCoverage.addItem(covId)
-        self.adjustToCovId()
+        for covId, _ in self.capabilities.coverageSummary.items():
+            if covId in self.describeCov.coverageInformation.keys():
+                self.cbCoverage.addItem(covId)
+        self.adjustCovTabToCovIdAndCreateBB()
 
-        self.setExtentLabel()
+        self.setSubsetExtentLabelFromMapCanvas()
+        self.lblExtentPolygon.setText("Draw polygon to get extent coordinates")
 
         self.tabWidget.setCurrentIndex(1)
 
@@ -282,37 +364,53 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
 
         self.tabInformation.setEnabled(True)
 
-        self.cleanInformationTab()
+        self.lblProvider.setText(self.capabilities.provider)
 
-        provider = self.capabilities.getProvider()
-        self.lblProvider.setText(provider)
+        self.lblFees.setText(self.capabilities.fees)
 
-        fees = self.capabilities.getFees()
-        self.lblFees.setText(fees)
-
-        constraints = self.capabilities.getConstraints()
-        self.lblConstraints.setText(constraints)
+        self.lblConstraints.setText(self.capabilities.constraints)
 
     def requestCapabilities(self, version: str, baseUrl: str) -> ET.ElementTree:
+        """  Requests capabilities of the service.
+        Raises:
+            CapabilitiesException, if any error occurs and the response is not a capabilities document"""
         capabilitiesRequest = self.buildCapabilitiesRequest(version=version, baseUrl=baseUrl)
-        print('capRequest', capabilitiesRequest)
         capabilitiesStr = sendRequest(request=capabilitiesRequest)
-        capabilitiesXml = ET.ElementTree(ET.fromstring(capabilitiesStr))
+        try:
+            root = ET.fromstring(capabilitiesStr)
+            capabilitiesXmlMainTag = root.tag
+            if capabilitiesXmlMainTag != f'{wcs_ns}Capabilities':
+                raise CapabilitiesException('Error: Could not read capabilities for this service')
+            capabilitiesXml = ET.ElementTree(ET.fromstring(capabilitiesStr))
+        except:
+            raise CapabilitiesException('Error: Could not read capabilities for this service')
         return capabilitiesXml
 
-    def buildCoverageRequest(self, covId: str, version: str) -> str:
-        params = {"REQUEST": "DescribeCoverage", "SERVICE": "WCS", "VERSION": version, "COVERAGEID": covId}
+    def buildDescribeCoverageRequest(self, covIds: List[str], version: str) -> str:
+        covIdsString = ','.join(covIds)
+        params = {"REQUEST": "DescribeCoverage", "SERVICE": "WCS", "VERSION": version, "COVERAGEID": covIdsString}
         queryString = urllib.parse.urlencode(params)
-        describeCoverageUrl = self.capabilities.getDescribeCoverageUrl()
+        describeCoverageUrl = self.capabilities.describeCoverageUrl
         url = self.checkUrlSyntax(describeCoverageUrl)
         return url + queryString
 
-    def describeCoverage(self, covId: str, version: str) -> DescribeCoverage:
-        coverageRequest = self.buildCoverageRequest(covId, version)
-        print('decrCoverageRequest', coverageRequest)
+    def requestDescribeCoverage(self, covIds: List[str], version: str) -> DescribeCoverage:
+        """Requests describe coverage information of all coverages provided by the servce.
+        Raises:
+            DescribeCoverageException, if any error occurs and the response is not a descrive coverage document"""
+        coverageRequest = self.buildDescribeCoverageRequest(covIds, version)
         coverageStr = sendRequest(request=coverageRequest)
-        coverageXml = ET.ElementTree(ET.fromstring(coverageStr))
-        return DescribeCoverage(coverageXml)
+        try:
+            root = ET.fromstring(coverageStr)
+            coverageXmlMainTag = root.tag
+            if coverageXmlMainTag != f'{wcs_ns}CoverageDescriptions':
+                raise DescribeCoverageException('Error: Could not read describeCoverage for this service')
+            describeCoverageXml = ET.ElementTree(ET.fromstring(coverageStr))
+        except:
+            raise DescribeCoverageException('Error: Could not read describeCoverage for this service')
+
+        return describeCoverageXml
+        #return DescribeCoverage(describeCoverageXml)
 
     def buildCapabilitiesRequest(self, version: str, baseUrl: str) -> str:
         params = {"REQUEST": "GetCapabilities", "SERVICE": "WCS", "Version": version}
@@ -322,35 +420,55 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
         return capabilitiesRequest
 
     def cleanGetCoverageTab(self):
-        self.lblTitle.clear()
+        self.tabGetCoverage.setEnabled(False)
+        self.lblTitle.setText('<no service loaded>')
+        self.lblVersion.setText('<no service loaded>')
         self.cbCoverage.clear()
-        self.cbCRS.clear()
+        self.cbCrs.clear()
         self.cbFormat.clear()
         self.btnGetCoverage.setEnabled(False)
-        self.lblExtentMapCanvas.clear()
-        self.lblExtentPolygon.clear()
+        self.lblExtentMapCanvas.setText('<no service loaded>')
+        self.lblExtentPolygon.setText('<no service loaded>')
 
     def cleanInformationTab(self):
-        self.lblProvider.clear()
-        self.lblFees.clear()
-        self.lblConstraints.clear()
+        self.tabInformation.setEnabled(False)
+        self.lblProvider.setText('<no service loaded>')
+        self.lblFees.setText('<no service loaded>')
+        self.lblConstraints.setText('<no service loaded>')
 
-    def adjustToCovId(self):
+    def adjustCovTabToCovIdAndCreateBB(self):
+
+        """
+        Resets the get coverage tab if a coverage is chosen in the dropdown menu.
+        Creates or resets the bounding box which shows the extent of the coverage.
+        The method is also called if the project's crs is changed.
+        """
+
+        self.cbCrs.clear()
+        self.cbSubsetCrs.clear()
 
         covId = self.cbCoverage.currentText()
-        if covId:
-            # Adjust crs dropdown
-            self.cbCRS.clear()
-            crsList = self.capabilities.getCoverageSummary()[covId].crs
-            self.cbCRS.addItems(crsList)
 
-            # Set bounding box
+        if covId:
+
+            coverageInformation = self.describeCov.coverageInformation[covId]
+
+            self.cbCrs.addItem(f'{coverageInformation.nativeCrs}*', coverageInformation.nativeCrs)
+            for crs in self.capabilities.crsx:
+                if crs != coverageInformation.nativeCrs:
+                    self.cbCrs.addItem(crs, crs)
+
+            self.cbSubsetCrs.addItem(f'{coverageInformation.nativeCrs}*', coverageInformation.nativeCrs)
+            for crs in self.capabilities.crsx:
+                self.cbSubsetCrs.addItem(crs, crs)
+
+            # Create bounding box rubber band and set it to coverage extent
             if not self.coverageBoundingBox:
                 self.coverageBoundingBox = BoundingBox('coverage_extent')
 
             self.coverageBoundingBox.clearBoundingBox()
-            lowerCorner = self.capabilities.getCoverageSummary()[covId].bbLowerCorner
-            upperCorner = self.capabilities.getCoverageSummary()[covId].bbUpperCorner
+            lowerCorner = self.capabilities.coverageSummary[covId].bbLowerCorner
+            upperCorner = self.capabilities.coverageSummary[covId].bbUpperCorner
             if lowerCorner and upperCorner:
                 x_1, y_1 = lowerCorner.split(" ")
                 x_2, y_2 = upperCorner.split(" ")
@@ -360,14 +478,18 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
                     x_2 = float(x_2)
                     y_2 = float(y_2)
                 except:
-                    # ToDo: log message
+                    warningMessage = 'No bounding box available for this coverage'
+                    self.writeToPluginMessageBar(warningMessage)
+                    logWarnMessage(warningMessage)
                     return
 
                 self.coverageBoundingBox.setBoundingBoxFromWgsCoordinates(x_1, y_1, x_2, y_2)
 
             else:
-                # ToDo: log message
-                pass
+                warningMessage = 'No bounding box available for this coverage'
+                self.writeToPluginMessageBar(warningMessage)
+                logWarnMessage(warningMessage)
+
 
     def resetPlugin(self):
         self.clearBoundingBoxes()
@@ -377,22 +499,32 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
         self.resetPlugin()
 
     def clearBoundingBoxes(self):
+        self.clearCoverageBoundingBox()
+        self.clearSubsetBoundingBox()
+
+    def clearCoverageBoundingBox(self):
         if self.coverageBoundingBox:
             self.coverageBoundingBox.clearBoundingBox()
-        if self.requestBoundingBox:
-            self.requestBoundingBox.clearBoundingBox()
-            self.lblExtentPolygon.setText("Draw polygon to get extent coordinates")
 
-    def setExtentLabel(self):
+    def clearSubsetBoundingBox(self):
+        if self.subsetBoundingBox:
+            self.subsetBoundingBox.clearBoundingBox()
+            self.lblExtentPolygon.setText("Draw polygon to get extent coordinates")
+            self.requestXMinPolygon = None
+            self.requestYMinPolygon = None
+            self.requestXMaxPolygon = None
+            self.requestYMaxPolygon = None
+
+    def setSubsetExtentLabelFromMapCanvas(self):
         """
         Collect current extent from mapCanvas and shows it in GUI
         """
         mapExtent = iface.mapCanvas().extent()
-        self.requestXMinCanvas = round(mapExtent.xMinimum(), 7)
-        self.requestYMinCanvas = round(mapExtent.yMinimum(), 7)
-        self.requestXMaxCanvas = round(mapExtent.xMaximum(), 7)
-        self.requestYMaxCanvas = round(mapExtent.yMaximum(), 7)
-        extentLabel = f"{self.requestXMinCanvas}, {self.requestYMinCanvas}, {self.requestXMaxCanvas}, {self.requestYMaxCanvas}"
+        self.requestXMinCanvas = mapExtent.xMinimum()
+        self.requestYMinCanvas = mapExtent.yMinimum()
+        self.requestXMaxCanvas = mapExtent.xMaximum()
+        self.requestYMaxCanvas = mapExtent.yMaximum()
+        extentLabel = f"{round(self.requestXMinCanvas, 5)}, {round(self.requestYMinCanvas, 5)}, {round(self.requestXMaxCanvas, 5)}, {round(self.requestYMaxCanvas, 5)}\n(Map crs: {self.mapCrs})"
         self.lblExtentMapCanvas.setText(extentLabel)
 
     def getCovTask(self):
@@ -423,20 +555,27 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
 
         self.btnGetCoverage.setEnabled(False)
 
-
     def getSubsets(self,
+                   covId: str,
                    mapCrs: QgsCoordinateReferenceSystem,
-                   outputCrsUri: str):
+                   subsetCrsUri: str):
 
-        coverageCrsUri = self.getNativeCoverageCrsUri()
-        if coverageCrsUri == outputCrsUri:
-            axisLabel0, axisLabel1 = self.describeCov.getAxisLabels()
+        """  """
+
+        nativeCrsUri = self.describeCov.coverageInformation[covId].nativeCrs
+
+        if nativeCrsUri == subsetCrsUri:
+            axisLabel0, axisLabel1 = self.describeCov.coverageInformation[covId].axisLabels
         else:
-            axisList = getAxisLabels(outputCrsUri)
+            axisList = getAxisLabels(subsetCrsUri)
             if not axisList:
-                # ToDo: Log message
-                axisLabel0, axisLabel1 = self.describeCov.getAxisLabels()
-                outputCrsUri = coverageCrsUri
+                logInfoMessage(f"Axis labels of subset crs could not be found. Native crs is used as subset crs instead.")
+                axisLabel0, axisLabel1 = self.describeCov.coverageInformation[covId].axisLabels
+                subsetCrsUri = nativeCrsUri
+            elif len(axisList) > 2:
+                logWarnMessage(f"More than two axes are not supported (yet): {axisList}")
+                axisLabel0, axisLabel1 = self.describeCov.coverageInformation[covId].axisLabels
+                subsetCrsUri = nativeCrsUri
             else:
                 axisLabel0, axisLabel1 = axisList
 
@@ -447,11 +586,11 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
 
         subsetMode = self.cbSetExtentMode.currentData()
 
-        outputCrs = QgsCoordinateReferenceSystem.fromOgcWmsCrs(outputCrsUri)
+        subsetCrs = QgsCoordinateReferenceSystem.fromOgcWmsCrs(switchCrsUriToOpenGis(subsetCrsUri))
 
-        if mapCrsUri != outputCrsUri:
+        if mapCrsUri != subsetCrsUri:
 
-            logInfoMessage(f"Transforming extent coordinates from {mapCrsUri} to {outputCrsUri}")
+            logInfoMessage(f"Transforming extent coordinates from {mapCrsUri} to {subsetCrsUri}")
 
             points = []
             if subsetMode == 'polygon':
@@ -466,20 +605,19 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
                 points.append(QgsPoint(self.requestXMaxCanvas, self.requestYMinCanvas))
                 points.append(QgsPoint(self.requestXMaxCanvas, self.requestYMaxCanvas))
 
-            transformation = QgsCoordinateTransform(mapCrs, outputCrs, QgsProject.instance())
+            transformation = QgsCoordinateTransform(mapCrs, subsetCrs, QgsProject.instance())
             for pt in points:
                 pt.transform(transformation)
 
             xValues = [pt.x() for pt in points]
-            xMin = round(min(xValues),4)
-            xMax = round(max(xValues),4)
+            xMin = min(xValues)
+            xMax = max(xValues)
 
             yValues = [pt.y() for pt in points]
-            yMin = round(min(yValues),4)
-            yMax = round(max(yValues),4)
+            yMin = min(yValues)
+            yMax = max(yValues)
 
         else:
-            print('else')
             if subsetMode == 'polygon':
                 xMin = self.requestXMinPolygon
                 xMax = self.requestXMaxPolygon
@@ -491,22 +629,20 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
                 yMin = self.requestYMinCanvas
                 yMax = self.requestYMaxCanvas
 
-        # ToDo: Axis labels are inverted?
+
+
         # we need to check if QGIS considers the CRS axes "inverted"
-        if outputCrs.hasAxisInverted():
+        if subsetCrs.hasAxisInverted():
             # e.g. WGS84 or Gauß-Krüger where "north" (y/lat) comes before "east" (x/lon)
-            print('inverted')
             subset0 = f"{axisLabel0}({yMin},{yMax})"
             subset1 = f"{axisLabel1}({xMin},{xMax})"
         else:
             # any standard x/y, e/n crs, e. g. UTM
             subset0 = f"{axisLabel0}({xMin},{xMax})"
             subset1 = f"{axisLabel1}({yMin},{yMax})"
-        print(subset0, subset1)
 
         return subset0, subset1
 
-    # ToDo: remove
     def getNativeCoverageCrsUri(self) -> str:
         # the coverage has a bounding box in its original CRS
         # the subsetting coordinates must correspond to this unless a different subsetting CRS is set
@@ -522,28 +658,27 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
         Raises:
             ValueError: If a OGC URI string could not be created for the map CRS
         """
-        version = self.lblVersion.text()
+        wcsVersion = self.lblVersion.text()
 
         covId = self.cbCoverage.currentText()
-        self.describeCov = self.describeCoverage(covId, version)
 
         # Map CRS is our QGIS project/canvas CRS: used for setting the extent
         mapCrs = QgsProject.instance().crs()
-        # Output CRS must be one of the CRS offered by the service (as OGC URI), chosen by the user in the dialog
-        outputCrsUri = self.cbCRS.currentText()
+        # Output and subset CRS must be one of the CRS offered by the service (as OGC URI), chosen by the user in the dialog
+        outputCrsUri = self.cbCrs.currentData()
+        subsetCrsUri = self.cbSubsetCrs.currentData()
 
         format = self.cbFormat.currentText()
 
         if self.cbUseSubset.isChecked():
-            subset0, subset1 = self.getSubsets(mapCrs=mapCrs, outputCrsUri=outputCrsUri)
-            print('subsets', subset0, subset1)
+            subset0, subset1 = self.getSubsets(covId=covId, mapCrs=mapCrs, subsetCrsUri=subsetCrsUri)
             params = [
                 ('REQUEST', 'GetCoverage'),
                 ('SERVICE', 'WCS'),
-                ('VERSION', version),
+                ('VERSION', wcsVersion),
                 ('COVERAGEID', covId),
                 ('OUTPUTCRS', outputCrsUri),
-                ('SUBSETTINGCRS', outputCrsUri),
+                ('SUBSETTINGCRS', subsetCrsUri),
                 ('FORMAT', format),
                 ('SUBSET', subset0),
                 ('SUBSET', subset1),
@@ -552,19 +687,16 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
             params = [
                 ('REQUEST', 'GetCoverage'),
                 ('SERVICE', 'WCS'),
-                ('VERSION', version),
+                ('VERSION', wcsVersion),
                 ('COVERAGEID', covId),
                 ('OUTPUTCRS', outputCrsUri),
                 ('FORMAT', format)
             ]
 
         querystring = urllib.parse.urlencode(params)
-        print('getcoveragestring', querystring)
 
-        getCoverageUrl = self.capabilities.getGetCoverageUrl()
-        getCoverageUrl = self.checkUrlSyntax(getCoverageUrl)
+        getCoverageUrl = self.checkUrlSyntax(self.capabilities.getCoverageUrl)
         getCoverageUrlQuery = getCoverageUrl + querystring
-        print('getCoverageUrlQuery', getCoverageUrlQuery)
 
         return getCoverageUrlQuery, covId
 
@@ -576,24 +708,6 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
         progressMessageBar = iface.messageBar().createMessage("GetCoverage Request")
         progressMessageBar.layout().addWidget(self.progress)
         iface.messageBar().pushWidget(progressMessageBar, Qgis.Info)
-
-    def requestXML(self, url):
-        logInfoMessage('Requested URL: ' + url)
-
-        try:
-            xmlReponse = urllib.request.urlopen(url)
-        except HTTPError as e:
-            logWarnMessage(str(e))
-            logWarnMessage(str(e.read().decode()))
-            openLog()
-            return None
-        except URLError as e:
-            logWarnMessage(str(e))
-            logWarnMessage(str(e.read().decode()))
-            openLog()
-            return None
-
-        return xmlReponse
 
     def checkUrlSyntax(self, url):
         if '?' in url:
@@ -609,7 +723,7 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
         return newUrl
 
     def enableBtnGetCapabilities(self):
-        if len(self.leUrl.text()) > 0:
+        if len(self.leBaseUrl.text()) > 0:
             self.btnGetCapabilities.setEnabled(True)
         else:
             self.btnGetCapabilities.setEnabled(False)
@@ -625,7 +739,6 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
         :param values: filepath and coverage as string, set to None by default
         :return:
         """
-
         if exception:
             raise exception
 
@@ -639,24 +752,13 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
         self.enableBtnGetCoverage()
         iface.messageBar().clearWidgets()
 
-
-def logInfoMessage(msg):
-    QgsMessageLog.logMessage(msg, logheader, Qgis.Info)
-
-
-def logWarnMessage(msg):
-    QgsMessageLog.logMessage(msg, logheader, Qgis.Warning)
-
-
-def openLog():
-    iface.mainWindow().findChild(QDockWidget, 'MessageLog').show()
+    def writeToPluginMessageBar(self, msg: str, level=Qgis.Warning, duration=0):
+        self.messageBar.pushMessage(msg, level=level, duration=duration)
 
 
 def getCoverage(task, url, covId):
-
-    #file = sendRequest(url)
+    print(url)
     logInfoMessage('Requested URL: ' + url)
-
     try:
         file, header = urllib.request.urlretrieve(url)
     except HTTPError as e:
@@ -667,6 +769,8 @@ def getCoverage(task, url, covId):
         logWarnMessage(str(e))
         logWarnMessage(str(e.read().decode()))
         return None
+    except:
+        pass
     return {'file': file, 'coverage': covId}
 
 

@@ -1,0 +1,36 @@
+28.03.2024
+
+- Enable subsetting in other crs than the the native one of a coverage:
+    - Axislabels of other crs are retrieved using the proj.db
+    - If it is not possible to find the axis labels, the native crs is used instead
+    - Currently only 2 axis are supported
+    - Gui contains now 2 crs dropdowns (output crs and subset crs)
+
+- Increase usability: Include a bounding box that shows the extent of the coverage:
+    - Bounding box adjusts if the crs of the project changes
+    - On selceting a coverage, the map view zooms to the bounding box.
+
+- Increase the usability of chosing a subset extent:
+    - Include a polygon mode to draw a request extent (Polygon bounding box is deleted if the crs of the project is changed)
+    - Show the map crs to the user in the plugin gui (Extent is given in map coordinates, best results are given if subset crs and map crs are equal)
+    - Make it possibe to deactivate subsetting (useful for small coverages)
+
+- Adjust Get Coverage Tab to the selected coverage:
+	- For each coverage the native crs is read from describeCoverage
+    and added to both dropdwons: output crs and subset crs
+
+- Add layouts to the plugin gui:
+    - The size of the content is adjusted to the size of the gui
+
+- Warnings and error handling:
+    - Reduce number of possible python errors while the plugin is running:
+        - Check the reponses from the server and prevent errors reading the xml
+        - Raise errors if substantial information is missing
+    - Include a message bar in the plugin gui: shows warning and errors related to the plugin
+    - Include dynamic gui elements: block tabs and buttons, as long as user input is missing
+
+- Include QgsNetworkManager:
+    - Native qgis support for wcs requests can be used (logs, F12 console...)
+
+- Include a plugin reset on ESC key (remove bounding boxes)
+

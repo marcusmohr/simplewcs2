@@ -9,10 +9,11 @@
         Functions are written in mixedCase, see https://docs.qgis.org/testing/en/docs/developers_guide/codingstandards.html
 """
 from dataclasses import dataclass
-import os.path
 from typing import List, Dict
-import urllib
 import xml.etree.ElementTree
+
+from .helpers import logWarnMessage
+from .custom_exceptions import CapabilitiesException
 
 
 # TODO is it ok that these use .0 versions?
@@ -24,158 +25,191 @@ xlink_ns = '{http://www.w3.org/1999/xlink}'
 
 
 @dataclass
-class CoverageSummary:
-    crs: List[str]
+class BbCorners:
     bbLowerCorner: str
     bbUpperCorner: str
 
 
 class Capabilities:
 
-    def __init__(self, capabilities: xml.etree.ElementTree):
 
-        self.title: str=''
-        self.provider: str=''
-        self.fees: str=''
-        self.constraints: str=''
-        self.describeCoverageUrl: str=''
-        self.getCoverageUrl: str=''
-        self.versions: List[str]=[]
-        self.formats: List[str]=[]
-        self.coverageSummary: Dict[str, CoverageSummary]
+    def __init__(self, capabilitiesXmlResponse: xml.etree.ElementTree):
 
-        self.readDataFromCapabilities(capabilities)
+        self.title: str = ''
+        self.provider: str = ''
+        self.fees: str = ''
+        self.constraints: str = ''
+        self.describeCoverageUrl: str = ''
+        self.getCoverageUrl: str = ''
+        self.versions: List[str] = []
+        self.formats: List[str] = []
+        self.coverageSummary: Dict[str, BbCorners]
+        self.crsx: List[str] = []
 
-    def getTitle(self) -> str:
-        return self.title
+        self.__initializeFromCapabilitiesResponse(capabilitiesXmlResponse)
 
-    def setTitle(self, title: str):
-        self.title = title
+    @property
+    def title(self) -> str:
+        return self._title
 
-    def getProvider(self) -> str:
-        return self.provider
+    @title.setter
+    def title(self, newTitle: str):
+        self._title = newTitle
 
-    def setProvider(self, provider: str):
-        self.provider = provider
+    @property
+    def provider(self) -> str:
+        return self._provider
 
-    def getFees(self) -> str:
-        return self.fees
+    @provider.setter
+    def provider (self, newProvider: str):
+        self._provider = newProvider
 
-    def setFees(self, fees: str):
-        self.fees = fees
+    @property
+    def fees(self) -> str:
+        return self._fees
 
-    def getConstraints(self) -> str:
-        return self.constraints
+    @fees.setter
+    def fees(self, newFees: str):
+        self._fees = newFees
 
-    def setConstraints(self, constraints: str):
-        self.constraints = constraints
+    @property
+    def constraints(self) -> str:
+        return self._constraints
 
-    def getDescribeCoverageUrl(self) -> str:
-        return self.describeCoverageUrl
+    @constraints.setter
+    def constraints(self, newConstraints: str):
+        self._constraints = newConstraints
 
-    def setDescribeCoverageUrl(self, describeCoverageUrl: str):
-        self.describeCoverageUrl = describeCoverageUrl
+    @property
+    def describeCoverageUrl(self) -> str:
+        return self._describeCoverageUrl
 
-    def getGetCoverageUrl(self) -> str:
-        return self.getCoverageUrl
+    @describeCoverageUrl.setter
+    def describeCoverageUrl(self, newUrl: str):
+        self._describeCoverageUrl = newUrl
 
-    def setGetCoverageUrl(self, getCoverageUrl: str):
-        self.getCoverageUrl = getCoverageUrl
+    @property
+    def getCoverageUrl(self) -> str:
+        return self._getCoverageUrl
 
-    def getVersions(self) -> List[str]:
-        return self.versions
+    @getCoverageUrl.setter
+    def getCoverageUrl(self, newUrl):
+        self._getCoverageUrl = newUrl
 
-    def setVersions(self, versions: List[str]):
-        self.versions = versions
+    @property
+    def versions(self) -> List[str]:
+        return self._versions
 
-    def getFormats(self) -> List[str]:
-        return self.formats
+    @versions.setter
+    def versions(self, newVersions):
+        self._versions = newVersions
 
-    def setFormats(self, formats: List[str]):
-        self.formats = formats
+    @property
+    def formats(self) -> List[str]:
+        return self._formats
 
-    def getCoverageSummary(self) -> Dict[str, CoverageSummary]:
-        return self.coverageSummary
+    @formats.setter
+    def formats(self, newFormats: List[str]):
+        self._formats = newFormats
 
-    def setCoverageSummary(self, coverageSummary: Dict[str, CoverageSummary]):
-        self.coverageSummary = coverageSummary
+    @property
+    def coverageSummary(self) -> Dict[str, BbCorners]:
+        return self._coverageSummary
 
-    def readDataFromCapabilities(self, capabilities: xml.etree.ElementTree):
+    @coverageSummary.setter
+    def coverageSummary(self, newCoverageSummary: Dict[str, BbCorners]):
+        self._coverageSummary = newCoverageSummary
 
-        describeCoverageGetElement = capabilities.find(
-            f'{ows_ns}OperationsMetadata/{ows_ns}Operation[@name="DescribeCoverage"]/{ows_ns}DCP/{ows_ns}HTTP/{ows_ns}Get')
-        if describeCoverageGetElement is not None:
-            self.describeCoverageUrl = describeCoverageGetElement.attrib.get(f'{xlink_ns}href')
-            if not self.describeCoverageUrl:
-                self.describeCoverageUrl = 'No Information available'
+    @property
+    def crsx(self) -> List[str]:
+        return self._crsx
+
+    @crsx.setter
+    def crsx(self, newCrsx: List[str]):
+        self._crsx = newCrsx
+
+    def __initializeFromCapabilitiesResponse(self, capabilitiesXmlResponse: xml.etree.ElementTree):
+
+        """
+        Raises:
+            CapabilitiesException, if ...
+        """
+
+        operationsMetadataElement = capabilitiesXmlResponse.find(f'{ows_ns}OperationsMetadata')
+        if operationsMetadataElement:
+            try:
+                self._describeCoverageUrl = operationsMetadataElement.find(f'{ows_ns}Operation[@name="DescribeCoverage"]/{ows_ns}DCP/{ows_ns}HTTP/{ows_ns}Get').attrib.get(f'{xlink_ns}href')
+            except:
+                logWarnMessage('Error in getCapabilities response: Missing describeCoverage url in <OperationsMetadata>')
+                self._describeCoverageUrl = ''
+            try:
+                self._getCoverageUrl = operationsMetadataElement.find(f'{ows_ns}Operation[@name="GetCoverage"]/{ows_ns}DCP/{ows_ns}HTTP/{ows_ns}Get').attrib.get(f'{xlink_ns}href')
+            except:
+                logWarnMessage('Error in getCapabilities response: Missing getCoverage url in OperationsMetadata')
+                self._getCoverageUrl = ''
         else:
-            # ToDo: Include information
-            self.describeCoverageUrl = 'No Information available'
+            self._describeCoverageUrl = ''
+            self._getCoverageUrl = ''
 
-        getCoverageElement = capabilities.find(
-            f'{ows_ns}OperationsMetadata/{ows_ns}Operation[@name="GetCoverage"]/{ows_ns}DCP/{ows_ns}HTTP/{ows_ns}Get')
-        if getCoverageElement is not None:
-            self.getCoverageUrl = getCoverageElement.attrib.get(f'{xlink_ns}href')
-            if not self.getCoverageUrl:
-                self.getCoverageUrl = 'No Information available'
-        else:
-            # ToDo: Include information
-            self.getCoverageUrl = 'No Information available'
-
-        titleElement = capabilities.find(f'{ows_ns}ServiceIdentification/{ows_ns}Title')
+        titleElement = capabilitiesXmlResponse.find(f'{ows_ns}ServiceIdentification/{ows_ns}Title')
         if titleElement is not None:
-            self.title = titleElement.text
+            self._title = titleElement.text
         else:
-            # ToDo
-            self.title = 'No Information available'
+            logWarnMessage('Error in getCapabilities response: title of coverage in Service Identification is missing')
+            self._title = 'No information available'
 
-        providerElement = capabilities.find(f'{ows_ns}ServiceProvider/{ows_ns}ProviderName')
+        providerElement = capabilitiesXmlResponse.find(f'{ows_ns}ServiceProvider/{ows_ns}ProviderName')
         if providerElement is not None:
-            self.provider = providerElement.text
+            self._provider = providerElement.text
         else:
-            # ToDo
-            self.provider = 'No Information available'
+            logWarnMessage('Error in getCapabilities response: provider information is missing')
+            self._provider = 'No ínformation available'
 
-        feesElement = capabilities.find(f'{ows_ns}ServiceIdentification/{ows_ns}Fees')
+        feesElement = capabilitiesXmlResponse.find(f'{ows_ns}ServiceIdentification/{ows_ns}Fees')
         if feesElement is not None:
-            self.fees = feesElement.text
+            self._fees = feesElement.text
         else:
-            # ToDO
-            self.fees = 'No Information available'
+            logWarnMessage('Error in getCapabilities response: fees are missing')
+            self._fees = 'No onformation available'
 
-        constraintsElement = capabilities.find(f'{ows_ns}ServiceIdentification/{ows_ns}AccessConstraints')
+        constraintsElement = capabilitiesXmlResponse.find(f'{ows_ns}ServiceIdentification/{ows_ns}AccessConstraints')
         if constraintsElement is not None:
-            self.constraint = constraintsElement.text
+            self._constraint = constraintsElement.text
         else:
-            self.constraints = 'No Information available'
+            logWarnMessage('Error in getCapabilities response: access constraints are missing')
+            self._constraints = 'No information available'
 
-        self.versions = []
-        serviceIdentificationContents = capabilities.find(f'{ows_ns}ServiceIdentification')
+        self._versions = []
+        serviceIdentificationContents = capabilitiesXmlResponse.find(f'{ows_ns}ServiceIdentification')
         if serviceIdentificationContents is not None:
             for version in serviceIdentificationContents.findall(f'.//{ows_ns}ServiceTypeVersion'):
-                self.versions.append(version.text)
-        self.versions.sort(reverse=True)
+                self._versions.append(version.text)
+        self._versions.sort(reverse=True)
+        if not self._versions:
+            logWarnMessage('Error in getCapabilities response: no information about versions found')
 
-        self.formats = []
-        crsx = []
-        serviceMetadataContents = capabilities.find(f'{wcs_ns}ServiceMetadata')
+        self._formats = []
+        self._crsx = []
+        serviceMetadataContents = capabilitiesXmlResponse.find(f'{wcs_ns}ServiceMetadata')
         if serviceMetadataContents is not None:
             for format in serviceMetadataContents.findall(f'.//{wcs_ns}formatSupported'):
-                self.formats.append(format.text)
+                self._formats.append(format.text)
+        if not self._formats:
+            raise CapabilitiesException("Error in getCapabilities response: no formats available")
 
-        serviceMetadataContents = capabilities.find(f'{wcs_ns}ServiceMetadata')
+        serviceMetadataContents = capabilitiesXmlResponse.find(f'{wcs_ns}ServiceMetadata')
         if serviceMetadataContents is not None:
             for crsElement in serviceMetadataContents.findall(f'.//{wcs_ns}Extension/{crs_ns}CrsMetadata/{crs_ns}crsSupported'):
                 if crsElement.text:
-                    crsx.append(crsElement.text)
-            # in case of wrong crs extension implementation
-            if not crsx:
+                    self._crsx.append(crsElement.text)
+            # In case of wrong crs extension implementation
+            if not self._crsx:
                 for crsElement in serviceMetadataContents.findall(f'.//{wcs_ns}Extension/{crs_serviceextension_ns}CrsMetadata/{crs_serviceextension_ns}crsSupported'):
                     if crsElement.text:
-                        crsx.append(crsElement.text)
+                        self._crsx.append(crsElement.text)
 
-        self.coverageSummary = {}
-        contents = capabilities.find(f'{wcs_ns}Contents')
+        self._coverageSummary = {}
+        contents = capabilitiesXmlResponse.find(f'{wcs_ns}Contents')
         if contents is not None:
             for coverageSummary in contents.findall(f'.//{wcs_ns}CoverageSummary'):
                 coverageIdElement = coverageSummary.find(f'.//{wcs_ns}CoverageId')
@@ -183,29 +217,28 @@ class Capabilities:
                     continue
                 coverageId = coverageIdElement.text
 
+                """
                 coverageCrsElement = coverageSummary.find(f'.//{ows_ns}BoundingBox')
                 if coverageCrsElement is not None:
-                    # ToDo: compare crs
                     coverageCrs = coverageCrsElement.attrib.get('crs')
-                    if coverageCrs:
+                    if coverageCrs and coverageCrs not in crsx:
                         allCrsx = crsx + [coverageCrs]
                     else:
                         allCrsx = crsx
-
-                coverageBbWgsLowerCornerElement = coverageSummary.find(f'.//{ows_ns}WGS84BoundingBox/{ows_ns}LowerCorner')
+                """
+                coverageBbWgsLowerCornerElement = coverageSummary.find(
+                    f'.//{ows_ns}WGS84BoundingBox/{ows_ns}LowerCorner')
                 if coverageBbWgsLowerCornerElement is not None:
                     coverageBbWgsLowerCorner = coverageBbWgsLowerCornerElement.text
                 else:
                     coverageBbWgsLowerCorner = None
-                coverageBbWgsUpperCornerElement = coverageSummary.find(f'.//{ows_ns}WGS84BoundingBox/{ows_ns}UpperCorner')
+                coverageBbWgsUpperCornerElement = coverageSummary.find(
+                    f'.//{ows_ns}WGS84BoundingBox/{ows_ns}UpperCorner')
                 if coverageBbWgsUpperCornerElement is not None:
                     coverageBbWgsUpperCorner = coverageBbWgsUpperCornerElement.text
                 else:
                     coverageBbWgsUpperCorner = None
 
-                summary = CoverageSummary(crs=allCrsx,
-                                          bbLowerCorner=coverageBbWgsLowerCorner,
-                                          bbUpperCorner=coverageBbWgsUpperCorner)
-                self.coverageSummary[coverageId] = summary
-
-
+                corners = BbCorners(bbLowerCorner=coverageBbWgsLowerCorner,
+                                    bbUpperCorner=coverageBbWgsUpperCorner)
+                self._coverageSummary[coverageId] = corners

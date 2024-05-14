@@ -3,63 +3,52 @@ from typing import List
 import re
 from qgis.core import Qgis, QgsCoordinateReferenceSystem
 
+
 def getAxisLabels(crsUri: str) -> List[str]:
+    """
+    Returns axis labels of the crs in the right order.
+    Information is retrieved from proj.db (by calculating a WKT-String)
+    """
     crsQgis = QgsCoordinateReferenceSystem.fromOgcWmsCrs(crsUri)
     try:
-        # ToDo: try further versions
         crsWktString = crsQgis.toWkt(4)
         return readAxisLabelsAndOrderFromWktString(crsWktString)
     except:
-        # ToDo: log message
         return []
 
 
 def readAxisLabelsAndOrderFromWktString(wktString: str) -> List[str]:
 
-    axisDict = OrderedDict()
-    axisList = []
-    axis: str = None
-    position: int = None
-    positionFound = True
-    findPosition = False
+    # Matches all parts of the WKT string that have the following pattern:
+    #   AXIS any characters (any characters) any characters and new lines ORDER[0-9]
+    #   Example: 'AXIS["geodetic latitude (Lat)",north,\n            ORDER[1]'
+    axisInformationList = re.findall("(AXIS.*?\(.*?\)(?s:.)*?ORDER\[[0-9]\])", wktString)
 
-    wktElements = wktString.split(',')
-    for el in wktElements:
-        if el.strip().startswith("AXIS"):
-            if axis:
-                axisList.append(axis)
-                if position >= 0:
-                    axisDict[position] = axis
-                else:
-                    positionFound = False
-                position = None
-            axis = re.findall(r'\(.*?\)', el)
-            if axis:
-                axis = axis[0][1:-1]
-                if axis:
-                    findPosition = True
-        if findPosition:
-            if el.strip().startswith("ORDER"):
-                position = re.findall(r'\[.*?\]', el)
-                if position:
-                    position = position[0][1:-1]
-                    if position:
-                        try:
-                            position = int(position) - 1
-                        except:
-                            position = None
-    if axis:
-        axisList.append(axis)
-        if position >= 0:
-            axisDict[position] = axis
-        else:
-            positionFound = False
+    axisLabelsList = [None] * len(axisInformationList)
+    for axisInformation in axisInformationList:
 
-    if positionFound:
-        orderedAxisDict = OrderedDict(sorted(axisDict.items()))
-        axisList = list(orderedAxisDict.values())
+        # Find axis labels
 
-    return axisList
+        # Example: AXIS["geodetic latitude (Lat)"
+        axisLabelString = re.findall("AXIS.*?\(.*?\)", axisInformation)[0]
+
+
+        # Example: Lat
+        axisLabel = re.findall("\(.*?\)", axisLabelString)[0][1:-1]
+
+        # Find axis position
+
+        # Example: ORDER[1]
+        axisPositionString = re.findall("ORDER\[[0-9]\]", axisInformation)[0]
+        # Exampel: 1
+        axisPosition = re.findall("[0-9]", axisPositionString)[0]
+
+        try:
+            axisLabelsList[int(axisPosition) - 1] = axisLabel
+        except:
+            return []
+
+    return axisLabelsList
 
 
 def crsAsOgcUri(crs: QgsCoordinateReferenceSystem) -> str:
