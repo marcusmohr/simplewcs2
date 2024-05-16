@@ -13,6 +13,7 @@ from typing import List
 from urllib.error import HTTPError, URLError
 
 from qgis.PyQt.QtCore import (Qt,
+                              QTemporaryFile,
                               QUrl,)
 from qgis.PyQt.QtGui import (QAction,
                              QKeySequence,)
@@ -756,11 +757,16 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
         self.messageBar.pushMessage(msg, level=level, duration=duration)
 
 
-def getCoverage(task, url, covId):
-    print(url)
-    logInfoMessage('Requested URL: ' + url)
+def getCoverage(task, urlGetCoverage: str, covId: str):
+    logInfoMessage('Requested URL: ' + urlGetCoverage)
     try:
-        file, header = urllib.request.urlretrieve(url)
+        networkManager = QgsNetworkAccessManager()
+        resultGetCoverage = networkManager.blockingGet(QNetworkRequest(QUrl(urlGetCoverage)))
+        replyContent = resultGetCoverage.content()
+        tempFile = QTemporaryFile()
+        if tempFile.open():
+            with open(tempFile.fileTemplate(), 'wb') as fl:
+                fl.write(replyContent)
     except HTTPError as e:
         logWarnMessage(str(e))
         logWarnMessage(str(e.read().decode()))
@@ -771,7 +777,7 @@ def getCoverage(task, url, covId):
         return None
     except:
         pass
-    return {'file': file, 'coverage': covId}
+    return {'file': tempFile.fileTemplate(), 'coverage': covId}
 
 
 def sendRequest(request: str) -> str:

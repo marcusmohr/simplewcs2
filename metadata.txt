@@ -6,7 +6,7 @@ about=
    Receive tiff files from OGC Web Coverage Services (v2.X) based on your map view. Designed to access certain german official geodata, e.g. digital aerial photographs.
    What it supports: WCS 2.X Core, CRS-Extension, Protocol-Binding KVP, Geo-TIFF
    What it doesn't support: Time series, scaling, gml cov, other extensions...
-version=0.2
+version=1.0.1
 author=Landesvermessung und Geobasisinformation Brandenburg - Marcus Mohr
 email=marcus.mohr@geobasis-bb.de
 changelog=
@@ -22,4 +22,3 @@ experimental=True
 deprecated=False
 server=False
 #plugin_dependencies=
-

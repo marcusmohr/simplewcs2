@@ -1,4 +1,7 @@
-28.03.2024
+Version 1.0.1 (16.05.24)
+- Use QgsNetworkManager for getCoverage request
+
+Version 1.0.0 (28.03.24)
 
 - Enable subsetting in other crs than the the native one of a coverage:
     - Axislabels of other crs are retrieved using the proj.db
@@ -30,7 +33,7 @@
     - Include dynamic gui elements: block tabs and buttons, as long as user input is missing
 
 - Include QgsNetworkManager:
-    - Native qgis support for wcs requests can be used (logs, F12 console...)
+    - GetCapabilities/DeescribeCoverage request: Native qgis support for wcs requests can be used (logs, F12 console,...)
 
 - Include a plugin reset on ESC key (remove bounding boxes)
 
