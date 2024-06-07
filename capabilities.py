@@ -174,7 +174,7 @@ class Capabilities:
 
         constraintsElement = capabilitiesXmlResponse.find(f'{ows_ns}ServiceIdentification/{ows_ns}AccessConstraints')
         if constraintsElement is not None:
-            self._constraint = constraintsElement.text
+            self._constraints = constraintsElement.text
         else:
             logWarnMessage('Error in getCapabilities response: access constraints are missing')
             self._constraints = 'No information available'
