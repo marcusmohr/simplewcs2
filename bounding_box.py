@@ -65,20 +65,6 @@ class BoundingBox(QgsRubberBand):
         geom = QgsGeometry.fromRect(boundingBoxRectangle)
         self.setToGeometry(geom)
 
-        iface.mapCanvas().zoomToFeatureExtent(boundingBoxRectangle)
-        iface.mapCanvas().refresh()
-        coordsTransform = QgsCoordinateTransform(sourceCrs, destCrs, QgsProject.instance())
-
-        lowerPoint = QgsPoint(x_1, y_1)
-        lowerPoint.transform(coordsTransform)
-        upperPoint = QgsPoint(x_2, y_2)
-        upperPoint.transform(coordsTransform)
-
-        boundingBoxRectangle = QgsRectangle(lowerPoint.x(), lowerPoint.y(), upperPoint.x(), upperPoint.y())
-        geom = QgsGeometry.fromRect(boundingBoxRectangle)
-        self.setToGeometry(geom)
-
-        iface.mapCanvas().zoomToFeatureExtent(boundingBoxRectangle)
         iface.mapCanvas().refresh()
 
     def setBoundingBoxPolygon(self, geom: QgsGeometry) -> QgsRectangle:

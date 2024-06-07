@@ -561,8 +561,6 @@ class SimpleWCSDialog(QDialog, FORM_CLASS):
                    mapCrs: QgsCoordinateReferenceSystem,
                    subsetCrsUri: str):
 
-        """  """
-
         nativeCrsUri = self.describeCov.coverageInformation[covId].nativeCrs
 
         if nativeCrsUri == subsetCrsUri:
@@ -763,10 +761,6 @@ def getCoverage(task, urlGetCoverage: str, covId: str):
         networkManager = QgsNetworkAccessManager()
         resultGetCoverage = networkManager.blockingGet(QNetworkRequest(QUrl(urlGetCoverage)))
         replyContent = resultGetCoverage.content()
-        tempFile = QTemporaryFile()
-        if tempFile.open():
-            with open(tempFile.fileTemplate(), 'wb') as fl:
-                fl.write(replyContent)
     except HTTPError as e:
         logWarnMessage(str(e))
         logWarnMessage(str(e.read().decode()))
@@ -776,8 +770,19 @@ def getCoverage(task, urlGetCoverage: str, covId: str):
         logWarnMessage(str(e.read().decode()))
         return None
     except:
-        pass
-    return {'file': tempFile.fileTemplate(), 'coverage': covId}
+        return None
+    try:
+        replyString = bytes(replyContent).decode()
+        root = ET.fromstring(replyString)
+        coverageXmlMainTag = root.tag
+        if 'ExceptionReport' in coverageXmlMainTag:
+            return None
+    except:
+        tempFile = QTemporaryFile()
+        if tempFile.open():
+            with open(tempFile.fileTemplate(), 'wb') as fl:
+                fl.write(replyContent)
+        return {'file': tempFile.fileTemplate(), 'coverage': covId}
 
 
 def sendRequest(request: str) -> str:
