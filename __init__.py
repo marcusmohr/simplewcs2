@@ -6,11 +6,13 @@
         email: marcus.mohr@geobasis-bb.de
         licence: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
 """
+from qgis.gui import QgisInterface
 
-def classFactory(iface):
+from .simplewcs import SimpleWCS
+
+def classFactory(iface: QgisInterface) -> SimpleWCS:
     """
-    Load SimpleWCS class from file SimpleWCS.
+    Load SimpleWCS class from file simplewcs.
     """
 
-    from .simplewcs import SimpleWCS
     return SimpleWCS(iface)

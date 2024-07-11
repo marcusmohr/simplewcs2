@@ -9,118 +9,70 @@
 
         Functions are written in mixedCase, see https://docs.qgis.org/testing/en/docs/developers_guide/codingstandards.html
 """
-import json
+
 import os.path
-import urllib
-from typing import Tuple
-from urllib.error import HTTPError, URLError
-from urllib.request import Request
-from urllib.parse import urlparse
+from typing import Optional
 
 from qgis.PyQt.QtCore import (QCoreApplication,
                               QSettings,
-                              Qt,
-                              QTranslator,
-                              QUrl,)
+                              QTranslator,)
 from qgis.PyQt.QtGui import (QAction,
                              QIcon)
-from qgis.PyQt.QtNetwork import QNetworkRequest
-from qgis.PyQt.QtWidgets import (QDockWidget,
-                                 QProgressBar,)
 
-from qgis.core import (QgsApplication,
-                       QgsCoordinateReferenceSystem,
-                       QgsDataSourceUri,
-                       QgsLayerTreeLayer,
-                       QgsMessageLog,
-                       QgsNetworkAccessManager,
-                       QgsProject,
-                       Qgis,
-                       QgsTask,
-                       QgsRasterLayer,
-                       QgsRectangle,
-                       QgsRasterLayer,
-                       )
+from qgis.gui import QgisInterface
 from qgis.utils import iface
+
 
 from .simplewcs_dialog import SimpleWCSDialog
 from .resources import *
 
 
 class SimpleWCS:
+    """ Simple WCS Plugin class. """
 
-    def __init__(self, iface):
+    def __init__(self, iface: QgisInterface) -> None:
+
+        """ Initializes the plugin and the dialog. """
+
         self.plugin_dir = os.path.dirname(__file__)
         locale = QSettings().value('locale/userLocale')[0:2]
         locale_path = os.path.join(
             self.plugin_dir,
             'i18n',
             'SimpleWCS_{}.qm'.format(locale))
-
         if os.path.exists(locale_path):
             self.translator = QTranslator()
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
 
-        self.actions = []
-        self.menu = self.tr('&Simple WCS 2')
-        self.dlg: SimpleWCSDialog = None
+        self.dlg: Optional[SimpleWCSDialog] = None
 
-    def tr(self, message):
-        """
-        Returns a translated string
-        """
+    def tr(self, message) -> str:
+        """ Returns a translated string. """
+
         return QCoreApplication.translate('SimpleWCS', message)
 
-    def add_action(self,
-                   iconPath,
-                   text,
-                   callback,
-                   enabledFlag=True,
-                   addToMenu=True,
-                   addToToolbar=True,
-                   statusTip=None,
-                   whatsThis=None,
-                   parent=None):
-        """
-        Adds plugin icon to toolbar
-        """
-        icon = QIcon(iconPath)
-        action = QAction(icon, text, parent)
-        action.triggered.connect(callback)
-        action.setEnabled(enabledFlag)
-        if statusTip is not None:
-            action.setStatusTip(statusTip)
-        if whatsThis is not None:
-            action.setWhatsThis(whatsThis)
-        if addToToolbar:
-            iface.addToolBarIcon(action)
-        if addToMenu:
-            iface.addPluginToRasterMenu(self.menu, action)
-        self.actions.append(action)
-        return action
-
-    def initGui(self):
-        """
-        Create the toolbar icon inside the QGIS GUI.
+    def initGui(self) -> None:
+        """Create the toolbar icon inside the QGIS GUI.
         """
         icon_path = ':/plugins/simplewcs/icon.png'
-        self.add_action(icon_path,
-                        text=self.tr('Simple WCS 2'),
-                        callback=self.run,
-                        parent=iface.mainWindow())
+        self.startAction = QAction(QIcon(icon_path), self.tr('Simple WCS 2'), iface.mainWindow())
+        iface.addPluginToRasterMenu(self.tr('Simple WCS 2'), self.startAction)
+        iface.addToolBarIcon(self.startAction)
+        self.startAction.triggered.connect(self.startWcsPlugin)
 
-    def unload(self):
-        """
-        Removes the toolbar icon from QGIS GUI.
-        """
-        for action in self.actions:
-            iface.removePluginRasterMenu(self.menu, action)
-            iface.removeToolBarIcon(action)
+    def unload(self) -> None:
+        """Removes the toolbar icon from QGIS GUI."""
+
+        iface.removePluginRasterMenu(self.tr('Simple WCS 2'), self.startAction)
+        iface.removeToolBarIcon(self.startAction)
+
         if self.dlg:
-            self.dlg.resetPlugin()
+            self.dlg.closeGui()
 
-    def run(self):
+    def startWcsPlugin(self) -> None:
+        """ Creates and shows plugin dialog. """
+
         if not self.dlg:
             self.dlg = SimpleWCSDialog()
         self.dlg.show()

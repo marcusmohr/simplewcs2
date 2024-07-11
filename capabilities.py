@@ -16,24 +16,24 @@ from .helpers import logWarnMessage
 from .custom_exceptions import CapabilitiesException
 
 
-# TODO is it ok that these use .0 versions?
 ows_ns = '{http://www.opengis.net/ows/2.0}'
 wcs_ns = '{http://www.opengis.net/wcs/2.0}'
-crs_ns = '{http://www.opengis.net/wcs/crs/1.0}'  # was overwritten in loop below!
+crs_ns = '{http://www.opengis.net/wcs/crs/1.0}'
 crs_serviceextension_ns = '{http://www.opengis.net/wcs/service-extension/crs/1.0}'
 xlink_ns = '{http://www.w3.org/1999/xlink}'
 
 
 @dataclass
 class BbCorners:
+    """Stores the corners of a bounding box of a coverage"""
     bbLowerCorner: str
     bbUpperCorner: str
 
 
 class Capabilities:
+    """Stores information from a get capabilities response of a wcs service"""
 
-
-    def __init__(self, capabilitiesXmlResponse: xml.etree.ElementTree):
+    def __init__(self, capabilitiesXmlResponse: xml.etree.ElementTree) -> None:
 
         self.title: str = ''
         self.provider: str = ''
@@ -128,12 +128,7 @@ class Capabilities:
     def crsx(self, newCrsx: List[str]):
         self._crsx = newCrsx
 
-    def __initializeFromCapabilitiesResponse(self, capabilitiesXmlResponse: xml.etree.ElementTree):
-
-        """
-        Raises:
-            CapabilitiesException, if ...
-        """
+    def __initializeFromCapabilitiesResponse(self, capabilitiesXmlResponse: xml.etree.ElementTree) -> None:
 
         operationsMetadataElement = capabilitiesXmlResponse.find(f'{ows_ns}OperationsMetadata')
         if operationsMetadataElement:
@@ -170,7 +165,7 @@ class Capabilities:
             self._fees = feesElement.text
         else:
             logWarnMessage('Error in getCapabilities response: fees are missing')
-            self._fees = 'No onformation available'
+            self._fees = 'No information available'
 
         constraintsElement = capabilitiesXmlResponse.find(f'{ows_ns}ServiceIdentification/{ows_ns}AccessConstraints')
         if constraintsElement is not None:
@@ -216,16 +211,6 @@ class Capabilities:
                 if coverageIdElement is None:
                     continue
                 coverageId = coverageIdElement.text
-
-                """
-                coverageCrsElement = coverageSummary.find(f'.//{ows_ns}BoundingBox')
-                if coverageCrsElement is not None:
-                    coverageCrs = coverageCrsElement.attrib.get('crs')
-                    if coverageCrs and coverageCrs not in crsx:
-                        allCrsx = crsx + [coverageCrs]
-                    else:
-                        allCrsx = crsx
-                """
                 coverageBbWgsLowerCornerElement = coverageSummary.find(
                     f'.//{ows_ns}WGS84BoundingBox/{ows_ns}LowerCorner')
                 if coverageBbWgsLowerCornerElement is not None:

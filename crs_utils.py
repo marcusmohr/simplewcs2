@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from typing import List
 import re
 from qgis.core import Qgis, QgsCoordinateReferenceSystem
@@ -7,7 +6,7 @@ from qgis.core import Qgis, QgsCoordinateReferenceSystem
 def getAxisLabels(crsUri: str) -> List[str]:
     """
     Returns axis labels of the crs in the right order.
-    Information is retrieved from proj.db (by calculating a WKT-String)
+    Information is retrieved from proj.db (by calculating a WKT-String).
     """
     crsQgis = QgsCoordinateReferenceSystem.fromOgcWmsCrs(crsUri)
     try:
@@ -18,6 +17,10 @@ def getAxisLabels(crsUri: str) -> List[str]:
 
 
 def readAxisLabelsAndOrderFromWktString(wktString: str) -> List[str]:
+
+    """
+    Finds the axis labels inside the wkt string and returns them in the right order as a list.
+    """
 
     # Matches all parts of the WKT string that have the following pattern:
     #   AXIS any characters (any characters) any characters and new lines ORDER[0-9]
@@ -30,17 +33,28 @@ def readAxisLabelsAndOrderFromWktString(wktString: str) -> List[str]:
         # Find axis labels
 
         # Example: AXIS["geodetic latitude (Lat)"
-        axisLabelString = re.findall("AXIS.*?\(.*?\)", axisInformation)[0]
+        axisLabelStringRe = re.findall("AXIS.*?\(.*?\)", axisInformation)
+        if not axisLabelStringRe:
+            return []
 
+        axisLabelString = axisLabelStringRe[0]
 
         # Example: Lat
-        axisLabel = re.findall("\(.*?\)", axisLabelString)[0][1:-1]
+        axisLabelRe = re.findall("\(.*?\)", axisLabelString)
+        if not axisLabelRe:
+            return []
+        axisLabel = axisLabelRe[0][1:-1]
+        if not axisLabel:
+            return []
 
         # Find axis position
-
         # Example: ORDER[1]
-        axisPositionString = re.findall("ORDER\[[0-9]\]", axisInformation)[0]
-        # Exampel: 1
+        axisPositionStringRe = re.findall("ORDER\[[0-9]\]", axisInformation)
+        if not axisPositionStringRe:
+            return []
+        axisPositionString = axisPositionStringRe[0]
+
+        # Example: 1
         axisPosition = re.findall("[0-9]", axisPositionString)[0]
 
         try:

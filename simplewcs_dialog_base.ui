@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>415</width>
-    <height>633</height>
+    <height>649</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -29,7 +29,7 @@
       <bool>true</bool>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tabUrl">
       <property name="enabled">
@@ -293,6 +293,16 @@
           </item>
           <item>
            <widget class="QComboBox" name="cbSubsetCrs"/>
+          </item>
+          <item>
+           <widget class="QCheckBox" name="cbAxisInversion">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Only applies to crs with inverted axis (e.g. wgs84) ) - useful if service advertises a false axis order&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Deactivate axis inversion</string>
+            </property>
+           </widget>
           </item>
           <item>
            <widget class="QWidget" name="wgExtentMode" native="true">

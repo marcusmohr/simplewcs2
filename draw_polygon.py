@@ -21,7 +21,6 @@ class DrawPolygon(QgsMapTool):
 
     def resetTool(self):
         if self.rubberBand:
-            #self.rubberBand.reset(Qgis.GeometryType.Polygon)
             iface.mapCanvas().scene().removeItem(self.rubberBand)
             self.rubberBand = None
 

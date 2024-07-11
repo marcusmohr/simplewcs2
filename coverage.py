@@ -7,7 +7,7 @@
         licence: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
 """
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List, Dict, Optional
 import xml.etree.ElementTree
 
 from .helpers import logWarnMessage
@@ -24,9 +24,11 @@ swe_ns = '{http://www.opengis.net/swe/2.0}'
 
 class DescribeCoverage:
 
-    def __init__(self, coverageXmlResponse: xml.etree.ElementTree):
+    """Stores information from descrive coverage response"""
 
-        self.coverageInformation: Dict[str, CoverageInformation] = None
+    def __init__(self, coverageXmlResponse: xml.etree.ElementTree) -> None:
+
+        self.coverageInformation: Optional[Dict[str, CoverageInformation]] = None
 
         self.readDescribeCoverage(coverageXmlResponse)
 
@@ -38,7 +40,7 @@ class DescribeCoverage:
     def coverageInformation(self, newInformation):
         self._coverageInformation = newInformation
 
-    def readDescribeCoverage(self, coverageXmlResponse: xml.etree.ElementTree):
+    def readDescribeCoverage(self, coverageXmlResponse: xml.etree.ElementTree) -> None:
 
         self.coverageInformation = {}
 
