@@ -6,41 +6,68 @@
         email: marcus.mohr@geobasis-bb.de
         licence: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
 """
+from dataclasses import dataclass
+from typing import List, Dict, Optional
+import xml.etree.ElementTree
 
-import os.path, urllib, xml.etree.ElementTree
+from .helpers import logWarnMessage
 
-class Coverage:
+@dataclass
+class CoverageInformation:
+    nativeCrs: str
+    axisLabels: List[str]
 
+wcs_ns = '{http://www.opengis.net/wcs/2.0}'
+gml_ns = '{http://www.opengis.net/gml/3.2}'
+gmlcov_ns = '{http://www.opengis.net/gmlcov/1.0}'
+swe_ns = '{http://www.opengis.net/swe/2.0}'
 
-    def __init__(self, coverage):
-        wcs = '{http://www.opengis.net/wcs/2.0}'
-        gml = '{http://www.opengis.net/gml/3.2}'
-        gmlcov = '{http://www.opengis.net/gmlcov/1.0}'
-        swe = '{http://www.opengis.net/swe/2.0}'
+class DescribeCoverage:
 
-        self.coverage = coverage
+    """Stores information from descrive coverage response"""
 
-        self.axisLabels = self.coverage.find(wcs + 'CoverageDescription/' + gml + 'boundedBy/' + gml + 'Envelope').attrib['axisLabels']
-        self.axisLabels = self.axisLabels.split(" ")
+    def __init__(self, coverageXmlResponse: xml.etree.ElementTree) -> None:
 
-        self.range = []
-        contents = self.coverage.find(wcs + 'CoverageDescription')
-        for field in contents.findall('.//' + gmlcov + 'rangeType/' + swe + 'DataRecord/' + swe + 'field'):
-            name = field.get('name')
-            self.range.append(name)
+        self.coverageInformation: Optional[Dict[str, CoverageInformation]] = None
 
+        self.readDescribeCoverage(coverageXmlResponse)
 
-    def getAxisLabels(self):
-        return self.axisLabels
+    @property
+    def coverageInformation(self) -> Dict[str, CoverageInformation]:
+        return self._coverageInformation
 
+    @coverageInformation.setter
+    def coverageInformation(self, newInformation):
+        self._coverageInformation = newInformation
 
-    def setAxisLabels(self, axisLabels):
-        self.axisLabels = axisLabels
+    def readDescribeCoverage(self, coverageXmlResponse: xml.etree.ElementTree) -> None:
 
+        self.coverageInformation = {}
 
-    def getRange(self):
-        return self.range
+        for covIdDescription in coverageXmlResponse.findall(f'.//{wcs_ns}CoverageDescription'):
 
+            covId = covIdDescription.attrib.get(f'{gml_ns}id')
+            if not covId:
+                logWarnMessage("Error in Describe Coverage: covId could not be read")
+                continue
 
-    def setRange(self, range):
-        self.range = range
+            envelopeElement = covIdDescription.find(f'{gml_ns}boundedBy/{gml_ns}Envelope')
+            if envelopeElement is not None:
+                nativeCrs = envelopeElement.attrib.get('srsName')
+                if not nativeCrs:
+                    logWarnMessage("Error in Describe Coverage: native crs could not be read")
+                    continue
+                axisLabels = envelopeElement.attrib.get('axisLabels')
+                if axisLabels:
+                    axisLabels = axisLabels.split(" ")
+                    if len(axisLabels) > 2:
+                        logWarnMessage(f"More than two axes are not supported (yet): {axisLabels}")
+                        continue
+                else:
+                    logWarnMessage("Error in Describe Coverage: native crs could not be read")
+                    continue
+            else:
+                logWarnMessage("Error in Describe Coverage: envelope could not be read")
+                continue
+
+            self.coverageInformation[covId] = CoverageInformation(nativeCrs=nativeCrs, axisLabels=axisLabels)

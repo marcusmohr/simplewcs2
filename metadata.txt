@@ -1,17 +1,35 @@
 [general]
 name=Simple WCS 2
-qgisMinimumVersion=3.4
+qgisMinimumVersion=3.30
 description=Provides basic support for OGC WCS 2.X and tiff format
-about=
-   Receive tiff files from OGC Web Coverage Services (v2.X) based on your map view. Designed to access certain german official geodata, e.g. digital aerial photographs.
+about=Receive tiff files from OGC Web Coverage Services (v2.X) based on your map view. Designed to access certain german official geodata, e.g. digital aerial photographs.
    What it supports: WCS 2.X Core, CRS-Extension, Protocol-Binding KVP, Geo-TIFF
    What it doesn't support: Time series, scaling, gml cov, other extensions...
-version=0.2
+
+   Die Weiterentwicklung dieses Plugins durch die WhereGroup wurde von der Hessischen Verwaltung für Bodenmanagement und Geoinformation (HVBG) initialisiert und finanziert.
+
+version=0.3
 author=Landesvermessung und Geobasisinformation Brandenburg - Marcus Mohr
 email=marcus.mohr@geobasis-bb.de
 changelog=
-   0.1 - First testing release (experimental)
-   0.2 - Added support for alternative implementation of crs extension, fixed wrong warnings (experimental)
+   Version 0.3 - (experimental, sponsored by HVBG)
+   - Add support for WCS 2.1
+   - Extend subsetting functionality:
+      - Subsetting can be deactivated (useful for small coverages)
+      - Include draw tool to define a subset
+      - Show map crs id in the gui (Most accurate results are given if subset crs and map crs are equal)
+      - Include subsetting in other crs than the the native one of a coverage (use proj.db to find axis labels, only 2 axis are supported)
+   - Adjust Get Coverage Tab to the selected coverage: Native crs (*) from describe coverage response is added to crs dropdowns
+   - Use gui layouts, add dynamic gui handling
+   - Add warnings and error handling, include a message bar inside the gui
+   - Use QgsNetworkManager for requests (instead of urllib): Debugging/Development tools can be used (F12)
+   - Include ESC key (close plugin, remove bounding boxes)
+
+   Version 0.2 - Added support for alternative implementation of crs extension, fixed wrong warnings (experimental)
+
+   Version 0.1 - First testing release (experimental)
+
+
 tracker=https://github.com/marcusmohr/simplewcs2/issues
 repository=https://github.com/marcusmohr/simplewcs2
 tags=wcs, wcs 2, ogc, web coverage service, tiff, geotiff, aerial, orthophotos, dop, dgm
@@ -22,4 +40,3 @@ experimental=True
 deprecated=False
 server=False
 #plugin_dependencies=
-
