@@ -6,10 +6,10 @@ about=Receive tiff files from OGC Web Coverage Services (v2.X) based on your map
    What it supports: WCS 2.X Core, CRS-Extension, Protocol-Binding KVP, Geo-TIFF
    What it doesn't support: Time series, scaling, gml cov, other extensions...
 
-   Die Weiterentwicklung dieses Plugins durch die WhereGroup wurde von der Hessischen Verwaltung für Bodenmanagement und Geoinformation (HVBG) initialisiert und finanziert.
+   Die Entwicklung der Version 0.3 dieses Plugins durch die WhereGroup wurde von der Hessischen Verwaltung für Bodenmanagement und Geoinformation (HVBG) initialisiert und finanziert.
 
 version=0.3
-author=Landesvermessung und Geobasisinformation Brandenburg - Marcus Mohr
+author=Landesvermessung und Geobasisinformation Brandenburg (Marcus Mohr), WhereGroup GmbH
 email=marcus.mohr@geobasis-bb.de
 changelog=
    Version 0.3 - (experimental, sponsored by HVBG)
@@ -36,7 +36,7 @@ tags=wcs, wcs 2, ogc, web coverage service, tiff, geotiff, aerial, orthophotos, 
 category=Raster
 homepage=https://www.geobasis-bb.de/
 icon=icon.png
-experimental=True
+experimental=False
 deprecated=False
 server=False
 #plugin_dependencies=
