@@ -12,7 +12,7 @@ version=0.3
 author=Landesvermessung und Geobasisinformation Brandenburg (Marcus Mohr), WhereGroup GmbH
 email=marcus.mohr@geobasis-bb.de
 changelog=
-   Version 0.3 - (experimental, sponsored by HVBG)
+   Version 0.3 - (sponsored by HVBG)
    - Add support for WCS 2.1
    - Extend subsetting functionality:
       - Subsetting can be deactivated (useful for small coverages)
