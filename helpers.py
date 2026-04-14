@@ -8,11 +8,11 @@ LOGHEADER = 'Simple WCS 2'
 
 
 def logInfoMessage(msg):
-    QgsMessageLog.logMessage(message=msg, tag=LOGHEADER, level=Qgis.Info)
+    QgsMessageLog.logMessage(message=msg, tag=LOGHEADER, level=Qgis.MessageLevel.Info)
 
 
 def logWarnMessage(msg):
-    QgsMessageLog.logMessage(message=msg, tag=LOGHEADER, level=Qgis.Warning)
+    QgsMessageLog.logMessage(message=msg, tag=LOGHEADER, level=Qgis.MessageLevel.Warning)
 
 
 def openLog():

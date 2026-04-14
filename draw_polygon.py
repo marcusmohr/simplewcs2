@@ -38,16 +38,16 @@ class DrawPolygon(QgsMapTool):
 
         mapToPixel = iface.mapCanvas().getCoordinateTransform()  # QgsMapToPixel instance
 
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             if not self.rubberBand:
                 self.rubberBand = QgsRubberBand(mapCanvas=iface.mapCanvas(), geometryType=Qgis.GeometryType.Polygon)
-                self.rubberBand.setLineStyle(Qt.DashLine)
+                self.rubberBand.setLineStyle(Qt.PenStyle.DashLine)
                 self.rubberBand.setWidth(PENWIDTH)
                 self.rubberBand.setColor(COLOR)
                 self.rubberBand.setFillColor(RUBBERBANDCOLOR)
             self.rubberBand.addPoint(mapToPixel.toMapCoordinates(thisPoint))
 
-        elif event.button() == Qt.RightButton:
+        elif event.button() == Qt.MouseButton.RightButton:
             if self.rubberBand and self.rubberBand.numberOfVertices() > 3:
                 # Finish rubberband sketch
                 self.rubberBand.removeLastPoint()
