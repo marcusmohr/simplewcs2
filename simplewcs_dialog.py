@@ -39,7 +39,6 @@ from qgis.PyQt.QtNetwork import QNetworkRequest
 from qgis.PyQt.QtWidgets import (QDialog,
                                  QProgressBar,)
 
-from .resources import *  # magically sets up icon etc...
 from .capabilities import Capabilities
 from .coverage import DescribeCoverage
 from .bounding_box import BoundingBox
