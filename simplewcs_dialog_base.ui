@@ -94,6 +94,27 @@
           </layout>
          </widget>
         </item>
+         <item>
+          <widget class="QLabel" name="lblServiceName">
+          <property name="font">
+           <font>
+            <pointsize>8</pointsize>
+            <weight>75</weight>
+            <bold>true</bold>
+           </font>
+          </property>
+          <property name="text">
+           <string>Service Name:</string>
+          </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="leServiceName">
+          <property name="placeholderText">
+           <string>e.g. Brandenburg DGM</string>
+          </property>
+          </widget>
+         </item>
        <item>
         <widget class="QLabel" name="lblUrl">
          <property name="font">

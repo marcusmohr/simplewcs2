@@ -158,6 +158,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
     def connectSignals(self) -> None:
         self.leBaseUrl.textChanged.connect(self.enableBtnGetCapabilities)
         self.leBaseUrl.textChanged.connect(self.updateUrlManagerButtons)
+        self.leServiceName.textChanged.connect(self.updateUrlManagerButtons)
         self.btnGetCapabilities.clicked.connect(self.adjustGetCoverageAndInformationTabsToService)
         self.cbSavedServices.currentIndexChanged.connect(self.onSavedServiceSelected)
         self.btnNewService.clicked.connect(self.prepareNewService)
@@ -176,6 +177,9 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         self.btnGetCoverage.clicked.connect(self.getCovTask)
 
     def formatSavedServiceLabel(self, service: dict) -> str:
+        serviceName = service.get('name', '').strip()
+        if serviceName:
+            return serviceName
         return f"{service['url']} [{service['version']}]"
 
     def getSelectedSavedServiceIndex(self) -> Optional[int]:
@@ -198,10 +202,11 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
             for service in parsedServices:
                 if not isinstance(service, dict):
                     continue
+                name = str(service.get('name', '')).strip()
                 url = str(service.get('url', '')).strip()
                 version = str(service.get('version', '')).strip()
                 if url and version in self.acceptedWcsVersions:
-                    self.savedServices.append({'url': url, 'version': version})
+                    self.savedServices.append({'name': name, 'url': url, 'version': version})
 
         self.refreshSavedServicesCombo(selectLastService=True)
 
@@ -249,6 +254,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
             return
 
         service = self.savedServices[index]
+        self.leServiceName.setText(service.get('name', ''))
         self.leBaseUrl.setText(service['url'])
         versionIndex = self.cbVersion.findText(service['version'])
         if versionIndex >= 0:
@@ -270,12 +276,14 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         self.cbSavedServices.setCurrentIndex(0)
         self.cbSavedServices.blockSignals(False)
         self.persistSavedServices(selectedIndex=None)
+        self.leServiceName.clear()
         self.leBaseUrl.clear()
         self.cbVersion.setCurrentIndex(1)
         self.updateUrlManagerButtons()
-        self.leBaseUrl.setFocus()
+        self.leServiceName.setFocus()
 
     def saveCurrentService(self) -> None:
+        serviceName = self.leServiceName.text().strip()
         baseUrl = self.leBaseUrl.text().strip()
         if not baseUrl:
             self.writeToPluginMessageBar('Please enter a WCS URL before saving.',
@@ -284,21 +292,21 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
             return
 
         service = {
+            'name': serviceName,
             'url': baseUrl,
             'version': self.cbVersion.currentText()
         }
         selectedIndex = self.getSelectedSavedServiceIndex()
 
         duplicateIndex = next((index for index, savedService in enumerate(self.savedServices)
-                               if savedService == service and index != selectedIndex), None)
+                               if savedService['url'] == service['url']
+                               and savedService['version'] == service['version']
+                               and index != selectedIndex), None)
         if duplicateIndex is not None:
-            self.refreshSavedServicesCombo(selectedIndex=duplicateIndex)
-            self.writeToPluginMessageBar('This WCS service is already saved.',
-                                         level=Qgis.Info,
-                                         duration=4)
-            return
-
-        if selectedIndex is None:
+            self.savedServices[duplicateIndex] = service
+            selectedIndex = duplicateIndex
+            infoMessage = 'WCS service updated.'
+        elif selectedIndex is None:
             self.savedServices.append(service)
             selectedIndex = len(self.savedServices) - 1
             infoMessage = 'WCS service saved.'
@@ -323,6 +331,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         del self.savedServices[selectedIndex]
         self.persistSavedServices(selectedIndex=None)
         self.refreshSavedServicesCombo()
+        self.leServiceName.clear()
         self.leBaseUrl.clear()
         self.cbVersion.setCurrentIndex(1)
         self.writeToPluginMessageBar('WCS service deleted.',
