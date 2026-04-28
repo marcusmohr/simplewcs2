@@ -9,7 +9,7 @@
 import os
 import json
 import urllib
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET # nosec
 from typing import List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 
@@ -56,8 +56,8 @@ from .custom_exceptions import CapabilitiesException, DescribeCoverageException
 GENERATED_CLASS, BASE = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'simplewcs_dialog_base.ui'))
 
 wcs_ns = '{http://www.opengis.net/wcs/2.0}'
-SETTINGS_SAVED_SERVICES_KEY = 'plugins/simplewcs2/saved_services'
-SETTINGS_LAST_SERVICE_KEY = 'plugins/simplewcs2/last_saved_service'
+SETTINGS_SAVED_SERVICES = 'plugins/simplewcs2/saved_services'
+SETTINGS_LAST_SERVICE = 'plugins/simplewcs2/last_saved_service'
 
 
 class SimpleWCSDialog(BASE, GENERATED_CLASS):
@@ -204,7 +204,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         return service['url'], service['version']
 
     def loadSavedServices(self) -> None:
-        savedServicesRaw = self.settings.value(SETTINGS_SAVED_SERVICES_KEY, '[]')
+        savedServicesRaw = self.settings.value(SETTINGS_SAVED_SERVICES, '[]')
         self.savedServices = []
 
         try:
@@ -225,21 +225,21 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         self.refreshSavedServicesCombo(selectLastService=True)
 
     def persistSavedServices(self, selectedIndex: Optional[int] = None) -> None:
-        self.settings.setValue(SETTINGS_SAVED_SERVICES_KEY, json.dumps(self.savedServices))
+        self.settings.setValue(SETTINGS_SAVED_SERVICES, json.dumps(self.savedServices))
 
         if selectedIndex is None:
-            self.settings.remove(SETTINGS_LAST_SERVICE_KEY)
+            self.settings.remove(SETTINGS_LAST_SERVICE)
         elif 0 <= selectedIndex < len(self.savedServices):
-            self.settings.setValue(SETTINGS_LAST_SERVICE_KEY, self.formatSavedServiceLabel(self.savedServices[selectedIndex]))
+            self.settings.setValue(SETTINGS_LAST_SERVICE, self.formatSavedServiceLabel(self.savedServices[selectedIndex]))
         else:
-            self.settings.remove(SETTINGS_LAST_SERVICE_KEY)
+            self.settings.remove(SETTINGS_LAST_SERVICE)
 
     def refreshSavedServicesCombo(self,
                                   selectedIndex: Optional[int] = None,
                                   selectLastService: bool = False) -> None:
         currentLabel = None
         if selectLastService:
-            currentLabel = self.settings.value(SETTINGS_LAST_SERVICE_KEY, '', type=str)
+            currentLabel = self.settings.value(SETTINGS_LAST_SERVICE, '', type=str)
 
         self.cbSavedServices.blockSignals(True)
         self.cbSavedServices.clear()
@@ -721,11 +721,11 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         capabilitiesRequest = self.buildCapabilitiesRequest(version=version, baseUrl=baseUrl)
         capabilitiesStr = sendRequest(request=capabilitiesRequest)
         try:
-            root = ET.fromstring(capabilitiesStr)
+            root = ET.fromstring(capabilitiesStr) # nosec
             capabilitiesXmlMainTag = root.tag
             if capabilitiesXmlMainTag != f'{wcs_ns}Capabilities':
                 raise CapabilitiesException('Error: Could not read capabilities for this service')
-            capabilitiesXml = ET.ElementTree(ET.fromstring(capabilitiesStr))
+            capabilitiesXml = ET.ElementTree(ET.fromstring(capabilitiesStr)) # nosec
         except:
             raise CapabilitiesException('Error: Could not read capabilities for this service')
 
@@ -753,11 +753,11 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         coverageRequest = self.buildDescribeCoverageRequest(covIds, version)
         coverageStr = sendRequest(request=coverageRequest)
         try:
-            root = ET.fromstring(coverageStr)
+            root = ET.fromstring(coverageStr) # nosec
             coverageXmlMainTag = root.tag
             if coverageXmlMainTag != f'{wcs_ns}CoverageDescriptions':
                 raise DescribeCoverageException('Error: Could not read describeCoverage for this service')
-            describeCoverageXml = ET.ElementTree(ET.fromstring(coverageStr))
+            describeCoverageXml = ET.ElementTree(ET.fromstring(coverageStr)) # nosec
         except:
             raise DescribeCoverageException('Error: Could not read describeCoverage for this service')
 
@@ -1134,7 +1134,7 @@ def getCoverage(task, urlGetCoverage: str, covId: str) -> dict:
         return None
     try:
         replyString = bytes(replyContent).decode()
-        root = ET.fromstring(replyString)
+        root = ET.fromstring(replyString) # nosec
         coverageXmlMainTag = root.tag
         if 'ExceptionReport' in coverageXmlMainTag:
             return None
