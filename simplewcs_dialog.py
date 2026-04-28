@@ -7,12 +7,14 @@
         licence: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
 """
 import os
+import json
 import urllib
 import xml.etree.ElementTree as ET
 from typing import List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 
 from qgis.PyQt.QtCore import (Qt,
+                              QSettings,
                               QUrl,)
 from qgis.PyQt.QtGui import (QAction,
                              QKeySequence,)
@@ -37,6 +39,7 @@ from qgis.utils import iface
 from qgis.PyQt import uic
 from qgis.PyQt.QtNetwork import QNetworkRequest
 from qgis.PyQt.QtWidgets import (QDialog,
+                                 QFileDialog,
                                  QProgressBar,)
 
 from .resources import *  # magically sets up icon etc...
@@ -54,6 +57,8 @@ from .custom_exceptions import CapabilitiesException, DescribeCoverageException
 GENERATED_CLASS, BASE = uic.loadUiType(os.path.join(os.path.dirname(__file__), 'simplewcs_dialog_base.ui'))
 
 wcs_ns = '{http://www.opengis.net/wcs/2.0}'
+SETTINGS_SAVED_SERVICES_KEY = 'plugins/simplewcs2/saved_services'
+SETTINGS_LAST_SERVICE_KEY = 'plugins/simplewcs2/last_saved_service'
 
 
 class SimpleWCSDialog(BASE, GENERATED_CLASS):
@@ -89,6 +94,8 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         self.mapCrs: str = self.getMapCrs()
 
         self.acceptedWcsVersions = ['2.1.0', '2.0.1', '2.0.0']
+        self.settings = QSettings()
+        self.savedServices: List[dict] = []
 
         self.setupUi(self)
 
@@ -127,7 +134,8 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         """
         self.cbVersion.addItems(self.acceptedWcsVersions)
         self.cbVersion.setCurrentIndex(1)
-        self.btnGetCapabilities.setEnabled(False)
+        self.loadSavedServices()
+        self.updateUrlManagerButtons()
 
     def setupGetCoverageTab(self) -> None:
         """
@@ -150,7 +158,15 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
 
     def connectSignals(self) -> None:
         self.leBaseUrl.textChanged.connect(self.enableBtnGetCapabilities)
+        self.leBaseUrl.textChanged.connect(self.updateUrlManagerButtons)
+        self.leServiceName.textChanged.connect(self.updateUrlManagerButtons)
         self.btnGetCapabilities.clicked.connect(self.adjustGetCoverageAndInformationTabsToService)
+        self.cbSavedServices.currentIndexChanged.connect(self.onSavedServiceSelected)
+        self.btnNewService.clicked.connect(self.prepareNewService)
+        self.btnSaveService.clicked.connect(self.saveCurrentService)
+        self.btnDeleteService.clicked.connect(self.deleteCurrentService)
+        self.btnImportServices.clicked.connect(self.importSavedServices)
+        self.btnExportServices.clicked.connect(self.exportSavedServices)
 
         self.cbCoverage.currentIndexChanged.connect(self.adjustCovTabToCovIdAndCreateBB)
         self.cbUseSubset.stateChanged.connect(self.showAndHideSubsetExtentWidget)
@@ -162,6 +178,283 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         QgsProject.instance().crsChanged.connect(self.adjustMapCrsAndLabelForSubsetExtent)
 
         self.btnGetCoverage.clicked.connect(self.getCovTask)
+
+    def formatSavedServiceLabel(self, service: dict) -> str:
+        serviceName = service.get('name', '').strip()
+        if serviceName:
+            return serviceName
+        return f"{service['url']} [{service['version']}]"
+
+    def getSelectedSavedServiceIndex(self) -> Optional[int]:
+        return self.cbSavedServices.currentData()
+
+    def normalizeSavedService(self, service: dict) -> Optional[dict]:
+        if not isinstance(service, dict):
+            return None
+
+        name = str(service.get('name', '')).strip()
+        url = str(service.get('url', '')).strip()
+        version = str(service.get('version', '')).strip()
+
+        if not url or version not in self.acceptedWcsVersions:
+            return None
+
+        return {'name': name, 'url': url, 'version': version}
+
+    def getSavedServiceIdentity(self, service: dict) -> Tuple[str, str]:
+        return service['url'], service['version']
+
+    def loadSavedServices(self) -> None:
+        savedServicesRaw = self.settings.value(SETTINGS_SAVED_SERVICES_KEY, '[]')
+        self.savedServices = []
+
+        try:
+            if isinstance(savedServicesRaw, str):
+                parsedServices = json.loads(savedServicesRaw)
+            else:
+                parsedServices = savedServicesRaw
+        except (TypeError, json.JSONDecodeError):
+            logWarnMessage('Could not load saved WCS services from settings')
+            parsedServices = []
+
+        if isinstance(parsedServices, list):
+            for service in parsedServices:
+                normalizedService = self.normalizeSavedService(service)
+                if normalizedService:
+                    self.savedServices.append(normalizedService)
+
+        self.refreshSavedServicesCombo(selectLastService=True)
+
+    def persistSavedServices(self, selectedIndex: Optional[int] = None) -> None:
+        self.settings.setValue(SETTINGS_SAVED_SERVICES_KEY, json.dumps(self.savedServices))
+
+        if selectedIndex is None:
+            self.settings.remove(SETTINGS_LAST_SERVICE_KEY)
+        elif 0 <= selectedIndex < len(self.savedServices):
+            self.settings.setValue(SETTINGS_LAST_SERVICE_KEY, self.formatSavedServiceLabel(self.savedServices[selectedIndex]))
+        else:
+            self.settings.remove(SETTINGS_LAST_SERVICE_KEY)
+
+    def refreshSavedServicesCombo(self,
+                                  selectedIndex: Optional[int] = None,
+                                  selectLastService: bool = False) -> None:
+        currentLabel = None
+        if selectLastService:
+            currentLabel = self.settings.value(SETTINGS_LAST_SERVICE_KEY, '', type=str)
+
+        self.cbSavedServices.blockSignals(True)
+        self.cbSavedServices.clear()
+        self.cbSavedServices.addItem('Saved services', None)
+
+        resolvedIndex = selectedIndex
+        for index, service in enumerate(self.savedServices):
+            label = self.formatSavedServiceLabel(service)
+            self.cbSavedServices.addItem(label, index)
+            if currentLabel and label == currentLabel:
+                resolvedIndex = index
+
+        if resolvedIndex is not None and 0 <= resolvedIndex < len(self.savedServices):
+            self.cbSavedServices.setCurrentIndex(resolvedIndex + 1)
+        else:
+            self.cbSavedServices.setCurrentIndex(0)
+
+        self.cbSavedServices.blockSignals(False)
+        self.updateUrlManagerButtons()
+
+        if resolvedIndex is not None and 0 <= resolvedIndex < len(self.savedServices):
+            self.applySavedService(resolvedIndex)
+
+    def applySavedService(self, index: int) -> None:
+        if not 0 <= index < len(self.savedServices):
+            return
+
+        service = self.savedServices[index]
+        self.leServiceName.setText(service.get('name', ''))
+        self.leBaseUrl.setText(service['url'])
+        versionIndex = self.cbVersion.findText(service['version'])
+        if versionIndex >= 0:
+            self.cbVersion.setCurrentIndex(versionIndex)
+        self.persistSavedServices(selectedIndex=index)
+        self.updateUrlManagerButtons()
+
+    def onSavedServiceSelected(self) -> None:
+        selectedIndex = self.getSelectedSavedServiceIndex()
+        if selectedIndex is None:
+            self.persistSavedServices(selectedIndex=None)
+            self.updateUrlManagerButtons()
+            return
+
+        self.applySavedService(selectedIndex)
+
+    def prepareNewService(self) -> None:
+        self.cbSavedServices.blockSignals(True)
+        self.cbSavedServices.setCurrentIndex(0)
+        self.cbSavedServices.blockSignals(False)
+        self.persistSavedServices(selectedIndex=None)
+        self.leServiceName.clear()
+        self.leBaseUrl.clear()
+        self.cbVersion.setCurrentIndex(1)
+        self.updateUrlManagerButtons()
+        self.leServiceName.setFocus()
+
+    def saveCurrentService(self) -> None:
+        serviceName = self.leServiceName.text().strip()
+        baseUrl = self.leBaseUrl.text().strip()
+        if not baseUrl:
+            self.writeToPluginMessageBar('Please enter a WCS URL before saving.',
+                                         level=Qgis.Warning,
+                                         duration=4)
+            return
+
+        service = {
+            'name': serviceName,
+            'url': baseUrl,
+            'version': self.cbVersion.currentText()
+        }
+        selectedIndex = self.getSelectedSavedServiceIndex()
+        serviceIdentity = self.getSavedServiceIdentity(service)
+
+        duplicateIndex = next((index for index, savedService in enumerate(self.savedServices)
+                               if self.getSavedServiceIdentity(savedService) == serviceIdentity
+                               and index != selectedIndex), None)
+        if duplicateIndex is not None:
+            self.savedServices[duplicateIndex] = service
+            selectedIndex = duplicateIndex
+            infoMessage = 'WCS service updated.'
+        elif selectedIndex is None:
+            self.savedServices.append(service)
+            selectedIndex = len(self.savedServices) - 1
+            infoMessage = 'WCS service saved.'
+        else:
+            self.savedServices[selectedIndex] = service
+            infoMessage = 'WCS service updated.'
+
+        self.persistSavedServices(selectedIndex=selectedIndex)
+        self.refreshSavedServicesCombo(selectedIndex=selectedIndex)
+        self.writeToPluginMessageBar(infoMessage,
+                                     level=Qgis.Info,
+                                     duration=4)
+
+    def deleteCurrentService(self) -> None:
+        selectedIndex = self.getSelectedSavedServiceIndex()
+        if selectedIndex is None:
+            self.writeToPluginMessageBar('Select a saved WCS service to delete it.',
+                                         level=Qgis.Warning,
+                                         duration=4)
+            return
+
+        del self.savedServices[selectedIndex]
+        self.persistSavedServices(selectedIndex=None)
+        self.refreshSavedServicesCombo()
+        self.leServiceName.clear()
+        self.leBaseUrl.clear()
+        self.cbVersion.setCurrentIndex(1)
+        self.writeToPluginMessageBar('WCS service deleted.',
+                                     level=Qgis.Info,
+                                     duration=4)
+
+    def exportSavedServices(self) -> None:
+        if not self.savedServices:
+            self.writeToPluginMessageBar('There are no saved WCS services to export.',
+                                         level=Qgis.Warning,
+                                         duration=4)
+            return
+
+        filePath, _ = QFileDialog.getSaveFileName(self,
+                                                  'Export saved WCS services',
+                                                  'simplewcs2-services.json',
+                                                  'JSON files (*.json);;All files (*)')
+        if not filePath:
+            return
+
+        try:
+            with open(filePath, 'w', encoding='utf-8') as exportFile:
+                json.dump(self.savedServices, exportFile, indent=2)
+        except OSError as e:
+            self.writeToPluginMessageBar(f'Export failed: {e}',
+                                         level=Qgis.Warning,
+                                         duration=6)
+            logWarnMessage(f'Export of saved WCS services failed: {e}')
+            return
+
+        self.writeToPluginMessageBar('Saved WCS services exported.',
+                                     level=Qgis.Info,
+                                     duration=4)
+
+    def importSavedServices(self) -> None:
+        filePath, _ = QFileDialog.getOpenFileName(self,
+                                                  'Import saved WCS services',
+                                                  '',
+                                                  'JSON files (*.json);;All files (*)')
+        if not filePath:
+            return
+
+        try:
+            with open(filePath, 'r', encoding='utf-8') as importFile:
+                importedServices = json.load(importFile)
+        except (OSError, json.JSONDecodeError) as e:
+            self.writeToPluginMessageBar(f'Import failed: {e}',
+                                         level=Qgis.Warning,
+                                         duration=6)
+            logWarnMessage(f'Import of saved WCS services failed: {e}')
+            return
+
+        if not isinstance(importedServices, list):
+            self.writeToPluginMessageBar('Import failed: file does not contain a service list.',
+                                         level=Qgis.Warning,
+                                         duration=6)
+            return
+
+        selectedIndex = None
+        importedCount = 0
+        skippedCount = 0
+
+        for importedService in importedServices:
+            normalizedService = self.normalizeSavedService(importedService)
+            if not normalizedService:
+                skippedCount += 1
+                continue
+
+            importedCount += 1
+            serviceIdentity = self.getSavedServiceIdentity(normalizedService)
+            existingIndex = next((index for index, savedService in enumerate(self.savedServices)
+                                  if self.getSavedServiceIdentity(savedService) == serviceIdentity), None)
+
+            if existingIndex is None:
+                self.savedServices.append(normalizedService)
+                selectedIndex = len(self.savedServices) - 1
+            else:
+                self.savedServices[existingIndex] = normalizedService
+                selectedIndex = existingIndex
+
+        if importedCount == 0:
+            self.writeToPluginMessageBar('Import contained no valid saved WCS services.',
+                                         level=Qgis.Warning,
+                                         duration=6)
+            return
+
+        self.persistSavedServices(selectedIndex=selectedIndex)
+        self.refreshSavedServicesCombo(selectedIndex=selectedIndex)
+
+        infoMessage = f'Imported {importedCount} saved WCS service'
+        if importedCount != 1:
+            infoMessage += 's'
+        if skippedCount:
+            infoMessage += f'; skipped {skippedCount} invalid entr'
+            infoMessage += 'y.' if skippedCount == 1 else 'ies.'
+        else:
+            infoMessage += '.'
+
+        self.writeToPluginMessageBar(infoMessage,
+                                     level=Qgis.Info,
+                                     duration=6)
+
+    def updateUrlManagerButtons(self) -> None:
+        hasBaseUrl = len(self.leBaseUrl.text().strip()) > 0
+        self.btnGetCapabilities.setEnabled(hasBaseUrl)
+        self.btnSaveService.setEnabled(hasBaseUrl)
+        self.btnDeleteService.setEnabled(self.getSelectedSavedServiceIndex() is not None)
+        self.btnExportServices.setEnabled(len(self.savedServices) > 0)
 
     def adjustBoundingBoxesToCrsIfVisible(self) -> None:
         """
@@ -792,10 +1085,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
 
     def enableBtnGetCapabilities(self) -> None:
         """Enables GetCapabilities button if a wcs service url is entered"""
-        if len(self.leBaseUrl.text()) > 0:
-            self.btnGetCapabilities.setEnabled(True)
-        else:
-            self.btnGetCapabilities.setEnabled(False)
+        self.btnGetCapabilities.setEnabled(len(self.leBaseUrl.text().strip()) > 0)
 
     def enableBtnGetCoverage(self) -> None:
         self.btnGetCoverage.setEnabled(True)
