@@ -42,7 +42,6 @@ from qgis.PyQt.QtWidgets import (QDialog,
                                  QFileDialog,
                                  QProgressBar,)
 
-from .resources import *  # magically sets up icon etc...
 from .capabilities import Capabilities
 from .coverage import DescribeCoverage
 from .bounding_box import BoundingBox
@@ -541,7 +540,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         if not geom.isGeosValid():
             errorMessage = "Drawn polygon has no valid geometry"
             self.writeToPluginMessageBar(errorMessage,
-                                         level=Qgis.Warning)
+                                         level=Qgis.MessageLevel.Warning)
             return
         if not self.subsetBoundingBox:
             self.subsetBoundingBox = BoundingBox('request_extent')
@@ -584,7 +583,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         except CapabilitiesException as e:
             errorMessage = e.args[0]
             self.writeToPluginMessageBar(errorMessage,
-                                         level=Qgis.Warning)
+                                         level=Qgis.MessageLevel.Warning)
             logWarnMessage(errorMessage)
             self.capabilities = None
             return False
@@ -628,7 +627,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         wcsVersion = self.getWcsVersion()
         if not wcsVersion:
             self.writeToPluginMessageBar(f'Service does not support one of the following Versions: {", ".join(self.acceptedWcsVersions)}',
-                                         level=Qgis.Warning)
+                                         level=Qgis.MessageLevel.Warning)
             logWarnMessage(
                 f'Service does not support one of the following Versions: {", ".join(self.acceptedWcsVersions)}')
             return
@@ -654,7 +653,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         except (DescribeCoverageException, NotImplementedError) as e:
             errorMessage = e.args[0]
             self.writeToPluginMessageBar(errorMessage,
-                                         level=Qgis.Warning)
+                                         level=Qgis.MessageLevel.Warning)
             logWarnMessage(errorMessage)
             self.capabilities = None
             self.describeCov = None
@@ -898,7 +897,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
             url,
             covId,
             on_finished=self.addRLayer,
-            flags=QgsTask.CanCancel
+            flags=QgsTask.Flag.CanCancel
         )
         QgsApplication.taskManager().addTask(self.task)
 
@@ -1064,11 +1063,11 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         """Creates a progress bar for the getCoverage task and adds it to the qgis gui."""
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
-        self.progress.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.progress.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
         progressMessageBar = iface.messageBar().createMessage("GetCoverage Request")
         progressMessageBar.layout().addWidget(self.progress)
-        iface.messageBar().pushWidget(progressMessageBar, Qgis.Info)
+        iface.messageBar().pushWidget(progressMessageBar, Qgis.MessageLevel.Info)
 
     def checkUrlSyntax(self, url: str) -> str:
         if '?' in url:
@@ -1112,7 +1111,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         self.enableBtnGetCoverage()
         iface.messageBar().clearWidgets()
 
-    def writeToPluginMessageBar(self, msg: str, level=Qgis.Warning, duration=0) -> None:
+    def writeToPluginMessageBar(self, msg: str, level=Qgis.MessageLevel.Warning, duration=0) -> None:
         self.messageBar.pushMessage(msg, level=level, duration=duration)
 
 

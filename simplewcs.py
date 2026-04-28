@@ -24,7 +24,6 @@ from qgis.utils import iface
 
 
 from .simplewcs_dialog import SimpleWCSDialog
-from .resources import *
 
 
 class SimpleWCS:
@@ -55,7 +54,7 @@ class SimpleWCS:
     def initGui(self) -> None:
         """Create the toolbar icon inside the QGIS GUI.
         """
-        icon_path = ':/plugins/simplewcs/icon.png'
+        icon_path = os.path.join(self.plugin_dir, 'icon.png')
         self.startAction = QAction(QIcon(icon_path), self.tr('Simple WCS 2'), iface.mainWindow())
         iface.addPluginToRasterMenu(self.tr('Simple WCS 2'), self.startAction)
         iface.addToolBarIcon(self.startAction)

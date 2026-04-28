@@ -49,7 +49,7 @@ class BoundingBox(QgsRubberBand):
         self.setWidth(style.PENWIDTH)
         self.setColor(style.COLOR)
         self.setFillColor(style.RUBBERBANDCOLOR)
-        self.setLineStyle(Qt.DashLine)
+        self.setLineStyle(Qt.PenStyle.DashLine)
 
     def clearBoundingBox(self) -> None:
         """ Resets the rubberband to an empty polygon"""
