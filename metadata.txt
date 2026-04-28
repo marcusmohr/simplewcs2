@@ -9,10 +9,12 @@ about=Receive tiff files from OGC Web Coverage Services (v2.X) based on your map
 
    Die Entwicklung der Version 0.3 dieses Plugins durch die WhereGroup wurde von der Hessischen Verwaltung für Bodenmanagement und Geoinformation (HVBG) initialisiert und finanziert.
 
-version=0.3
+version=1.0
 author=Landesvermessung und Geobasisinformation Brandenburg (Marcus Mohr), WhereGroup GmbH
 email=marcus.mohr@geobasis-bb.de
 changelog=
+   Version 1.0 - Added an URL manager and qt6 support for QGIS4 (Thanks to Tobias Rosskopf)
+
    Version 0.3 - (sponsored by HVBG)
    - Add support for WCS 2.1
    - Extend subsetting functionality:
