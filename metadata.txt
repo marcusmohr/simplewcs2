@@ -13,6 +13,8 @@ version=1.0
 author=Landesvermessung und Geobasisinformation Brandenburg (Marcus Mohr), WhereGroup GmbH
 email=marcus.mohr@geobasis-bb.de
 changelog=
+   Version 1.1 - Added support for authentication (Thanks to Niels Siethoff)
+
    Version 1.0 - Added an URL manager and qt6 support for QGIS4 (Thanks to Tobias Rosskopf)
 
    Version 0.3 - (sponsored by HVBG)
