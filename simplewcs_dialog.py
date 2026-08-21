@@ -314,7 +314,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         baseUrl = self.leBaseUrl.text().strip()
         if not baseUrl:
             self.writeToPluginMessageBar('Please enter a WCS URL before saving.',
-                                         level=Qgis.Warning,
+                                         level=Qgis.MessageLevel.Warning,
                                          duration=4)
             return
 
@@ -345,14 +345,14 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         self.persistSavedServices(selectedIndex=selectedIndex)
         self.refreshSavedServicesCombo(selectedIndex=selectedIndex)
         self.writeToPluginMessageBar(infoMessage,
-                                     level=Qgis.Info,
+                                     level=Qgis.MessageLevel.Info,
                                      duration=4)
 
     def deleteCurrentService(self) -> None:
         selectedIndex = self.getSelectedSavedServiceIndex()
         if selectedIndex is None:
             self.writeToPluginMessageBar('Select a saved WCS service to delete it.',
-                                         level=Qgis.Warning,
+                                         level=Qgis.MessageLevel.Warning,
                                          duration=4)
             return
 
@@ -363,13 +363,13 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
         self.leBaseUrl.clear()
         self.cbVersion.setCurrentIndex(1)
         self.writeToPluginMessageBar('WCS service deleted.',
-                                     level=Qgis.Info,
+                                     level=Qgis.MessageLevel.Info,
                                      duration=4)
 
     def exportSavedServices(self) -> None:
         if not self.savedServices:
             self.writeToPluginMessageBar('There are no saved WCS services to export.',
-                                         level=Qgis.Warning,
+                                         level=Qgis.MessageLevel.Warning,
                                          duration=4)
             return
 
@@ -385,13 +385,13 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
                 json.dump(self.savedServices, exportFile, indent=2)
         except OSError as e:
             self.writeToPluginMessageBar(f'Export failed: {e}',
-                                         level=Qgis.Warning,
+                                         level=Qgis.MessageLevel.Warning,
                                          duration=6)
             logWarnMessage(f'Export of saved WCS services failed: {e}')
             return
 
         self.writeToPluginMessageBar('Saved WCS services exported.',
-                                     level=Qgis.Info,
+                                     level=Qgis.MessageLevel.Info,
                                      duration=4)
 
     def importSavedServices(self) -> None:
@@ -407,14 +407,14 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
                 importedServices = json.load(importFile)
         except (OSError, json.JSONDecodeError) as e:
             self.writeToPluginMessageBar(f'Import failed: {e}',
-                                         level=Qgis.Warning,
+                                         level=Qgis.MessageLevel.Warning,
                                          duration=6)
             logWarnMessage(f'Import of saved WCS services failed: {e}')
             return
 
         if not isinstance(importedServices, list):
             self.writeToPluginMessageBar('Import failed: file does not contain a service list.',
-                                         level=Qgis.Warning,
+                                         level=Qgis.MessageLevel.Warning,
                                          duration=6)
             return
 
@@ -442,7 +442,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
 
         if importedCount == 0:
             self.writeToPluginMessageBar('Import contained no valid saved WCS services.',
-                                         level=Qgis.Warning,
+                                         level=Qgis.MessageLevel.Warning,
                                          duration=6)
             return
 
@@ -459,7 +459,7 @@ class SimpleWCSDialog(BASE, GENERATED_CLASS):
             infoMessage += '.'
 
         self.writeToPluginMessageBar(infoMessage,
-                                     level=Qgis.Info,
+                                     level=Qgis.MessageLevel.Info,
                                      duration=6)
 
     def updateUrlManagerButtons(self) -> None:

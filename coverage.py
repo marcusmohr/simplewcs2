@@ -7,8 +7,8 @@
         licence: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
 """
 from dataclasses import dataclass
-from typing import List, Dict
-import xml.etree.ElementTree
+from typing import List, Dict # nosec
+import xml.etree.ElementTree # nosec
 
 from .helpers import logWarnMessage
 

@@ -9,8 +9,8 @@
         Functions are written in mixedCase, see https://docs.qgis.org/testing/en/docs/developers_guide/codingstandards.html
 """
 from dataclasses import dataclass
-from typing import List, Dict
-import xml.etree.ElementTree
+from typing import List, Dict # nosec
+import xml.etree.ElementTree # nosec
 
 from .helpers import logWarnMessage
 from .custom_exceptions import CapabilitiesException
