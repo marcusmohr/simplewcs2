@@ -7,7 +7,7 @@
         licence: GNU GENERAL PUBLIC LICENSE Version 3, 29 June 2007
 """
 from dataclasses import dataclass
-from typing import List, Dict, Optional
+from typing import List, Dict
 import xml.etree.ElementTree
 
 from .helpers import logWarnMessage
@@ -28,7 +28,7 @@ class DescribeCoverage:
 
     def __init__(self, coverageXmlResponse: xml.etree.ElementTree) -> None:
 
-        self.coverageInformation: Optional[Dict[str, CoverageInformation]] = None
+        self.coverageInformation: Dict[str, CoverageInformation] | None = None
 
         self.readDescribeCoverage(coverageXmlResponse)
 

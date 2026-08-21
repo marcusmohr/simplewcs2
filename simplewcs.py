@@ -11,7 +11,6 @@
 """
 
 import os.path
-from typing import Optional
 
 from qgis.PyQt.QtCore import (QCoreApplication,
                               QSettings,
@@ -44,7 +43,7 @@ class SimpleWCS:
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
 
-        self.dlg: Optional[SimpleWCSDialog] = None
+        self.dlg: SimpleWCSDialog | None = None
 
     def tr(self, message) -> str:
         """ Returns a translated string. """
