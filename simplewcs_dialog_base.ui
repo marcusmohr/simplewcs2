@@ -139,7 +139,6 @@
             <property name="font">
              <font>
               <pointsize>8</pointsize>
-              <weight>75</weight>
               <bold>true</bold>
              </font>
             </property>
@@ -160,7 +159,6 @@
             <property name="font">
              <font>
               <pointsize>8</pointsize>
-              <weight>75</weight>
               <bold>true</bold>
              </font>
             </property>
@@ -189,7 +187,6 @@
            <widget class="QLabel" name="lblVersionDesc">
             <property name="font">
              <font>
-              <weight>75</weight>
               <bold>true</bold>
              </font>
             </property>
@@ -206,7 +203,6 @@
             <property name="font">
              <font>
               <pointsize>8</pointsize>
-              <weight>75</weight>
               <bold>true</bold>
              </font>
             </property>
@@ -262,7 +258,6 @@
          <property name="font">
           <font>
            <pointsize>7</pointsize>
-           <weight>50</weight>
            <bold>false</bold>
           </font>
          </property>
@@ -285,7 +280,6 @@
         <widget class="QLabel" name="lblTitleDesc">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -298,7 +292,6 @@
         <widget class="QLabel" name="lblTitle">
          <property name="font">
           <font>
-           <weight>50</weight>
            <bold>false</bold>
           </font>
          </property>
@@ -320,7 +313,6 @@
         <widget class="QLabel" name="lblVersionDesc_2">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -333,7 +325,6 @@
         <widget class="QLabel" name="lblVersion">
          <property name="font">
           <font>
-           <weight>50</weight>
            <bold>false</bold>
           </font>
          </property>
@@ -355,7 +346,6 @@
         <widget class="QLabel" name="lblCoverageDesc">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -371,7 +361,6 @@
         <widget class="QLabel" name="lblFormatDesc">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -387,7 +376,6 @@
         <widget class="QLabel" name="lblCRSDesc">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -403,7 +391,6 @@
         <widget class="QCheckBox" name="cbUseSubset">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -434,7 +421,6 @@
            <widget class="QLabel" name="label">
             <property name="font">
              <font>
-              <weight>75</weight>
               <bold>true</bold>
              </font>
             </property>
@@ -475,7 +461,6 @@
               <widget class="QLabel" name="lblExtentDesc">
                <property name="font">
                 <font>
-                 <weight>75</weight>
                  <bold>true</bold>
                 </font>
                </property>
@@ -608,7 +593,6 @@
         <widget class="QLabel" name="lblProviderDesc">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -621,7 +605,6 @@
         <widget class="QLabel" name="lblProvider">
          <property name="font">
           <font>
-           <weight>50</weight>
            <bold>false</bold>
           </font>
          </property>
@@ -640,7 +623,6 @@
         <widget class="QLabel" name="lblFeesDesc">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -653,7 +635,6 @@
         <widget class="QLabel" name="lblFees">
          <property name="font">
           <font>
-           <weight>50</weight>
            <bold>false</bold>
           </font>
          </property>
@@ -672,7 +653,6 @@
         <widget class="QLabel" name="lblConstraintsDesc">
          <property name="font">
           <font>
-           <weight>75</weight>
            <bold>true</bold>
           </font>
          </property>
@@ -685,7 +665,6 @@
         <widget class="QLabel" name="lblConstraints">
          <property name="font">
           <font>
-           <weight>50</weight>
            <bold>false</bold>
           </font>
          </property>
